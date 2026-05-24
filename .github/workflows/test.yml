@@ -21,7 +21,7 @@ jobs:
         python-version: ["3.13", "3.14"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -51,7 +51,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.14'
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           file: ./coverage.xml
           fail_ci_if_error: false
@@ -60,7 +60,7 @@ jobs:
     name: mypy strict
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python 3.14
         uses: actions/setup-python@v5
@@ -82,5 +82,5 @@ jobs:
     name: Home Assistant manifest validation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: home-assistant/actions/hassfest@master
