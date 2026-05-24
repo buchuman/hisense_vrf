@@ -1,0 +1,10 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyacmodbus"
+version = "0.2.0"
+description = "Async Modbus TCP client for Hisense i-Modkit VRF gateways"
+requires-python = ">=3.14"
+dependencies = ["pymodbus>=3.0.0"]

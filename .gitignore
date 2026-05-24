@@ -1,0 +1,71 @@
+# Python bytecode / caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Build / dist artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+wheels/
+.eggs/
+
+# Virtualenvs
+venv/
+.venv/
+env/
+.env
+
+# Test + coverage
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+.cache/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+.pyre/
+.pytype/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.spyproject/
+.ropeproject/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux
+.directory
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Local notes (kept outside the repo)
+notes/
+scratch/
+TODO.local.md
+
+# Claude Code session-local settings (contains absolute paths)
+.claude/
+
+# Home Assistant artifacts that might leak in
+home-assistant.log*
+home-assistant_v2.db*
+.storage/

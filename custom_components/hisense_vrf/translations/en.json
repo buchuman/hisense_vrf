@@ -1,0 +1,731 @@
+{
+  "issues": {
+    "write_failed_repeated": {
+      "title": "{unit_name} is not responding to commands",
+      "description": "The integration has failed to confirm {threshold} consecutive writes to **{unit_name}**.\n\nLikely causes:\n- A `Lock *` switch is enabled for that unit (Settings → Devices → {unit_name} → Configuration).\n- An alarm is active (check the unit's `Alarm code` and `Alarm description` sensors).\n- The compressor is in a 3-min protection cooldown after a recent stop.\n- The outdoor unit is at its capacity limit or in startup.\n- The wire controller has the unit in a different state.\n\nThis issue clears automatically the next time a write succeeds."
+    }
+  },
+  "config": {
+    "step": {
+      "user": {
+        "title": "Hisense VRF gateway",
+        "description": "Configure the connection to the i-Modkit Modbus TCP gateway.",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "verify_delay_s": "Verification delay (seconds)",
+          "verify_retries": "Verification retries",
+          "off_pending_ttl_s": "Off-pending TTL (seconds)",
+          "polling_enabled": "Enable polling",
+          "poll_interval_s": "Polling interval (seconds between cycles)",
+          "poll_spacing_s": "Polling spacing (seconds between unit reads)",
+          "poll_gateway_every_n_cycles": "Poll gateway/outdoor every N cycles"
+        },
+        "data_description": {
+          "host": "IP address or hostname of the i-Modkit gateway.",
+          "port": "Modbus TCP port (default 502).",
+          "verify_delay_s": "Seconds to wait after a write before reading back the unit state.",
+          "verify_retries": "How many additional reads to attempt if the value does not match yet.",
+          "off_pending_ttl_s": "While a unit is off, accumulated UI changes are kept for this many seconds before being discarded. Press ON within that window to flush them in one bundled write.",
+          "polling_enabled": "When enabled, the integration reads each unit on a fixed cadence so the UI reflects external changes.",
+          "poll_interval_s": "Pause between polling cycles. 0 means cycles run back-to-back.",
+          "poll_spacing_s": "Pause between consecutive unit reads inside a cycle. Leave at 0 unless you need to throttle.",
+          "poll_gateway_every_n_cycles": "Read the gateway state and outdoor unit only every N cycles (these change slowly)."
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Hisense VRF gateway",
+        "description": "Change the host or port of the i-Modkit gateway. All other options (verification, polling) are preserved.",
+        "data": {
+          "host": "Host",
+          "port": "Port"
+        },
+        "data_description": {
+          "host": "New IP address or hostname of the i-Modkit gateway.",
+          "port": "New Modbus TCP port."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to the gateway.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This gateway is already configured.",
+      "reconfigure_successful": "Reconfiguration was successful."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Hisense VRF settings",
+        "data": {
+          "verify_delay_s": "Verification delay (seconds)",
+          "verify_retries": "Verification retries",
+          "off_pending_ttl_s": "Off-pending TTL (seconds)",
+          "polling_enabled": "Enable polling",
+          "poll_interval_s": "Polling interval (seconds between cycles)",
+          "poll_spacing_s": "Polling spacing (seconds between unit reads)",
+          "poll_gateway_every_n_cycles": "Poll gateway/outdoor every N cycles"
+        },
+        "data_description": {
+          "verify_delay_s": "Seconds between a write and the verification read.",
+          "verify_retries": "Additional reads to try if the value does not match.",
+          "off_pending_ttl_s": "How long to keep accumulated UI changes for a unit that is off before discarding them.",
+          "polling_enabled": "Toggle background polling without uninstalling the integration.",
+          "poll_interval_s": "Pause between polling cycles. 0 means cycles run back-to-back.",
+          "poll_spacing_s": "Pause between consecutive unit reads inside a cycle.",
+          "poll_gateway_every_n_cycles": "Read gateway and outdoor units only every N cycles."
+        }
+      }
+    }
+  },
+  "entity": {
+    "climate": {
+      "ac_unit": {
+        "name": "AC unit"
+      }
+    },
+    "sensor": {
+      "inlet_temp": {
+        "name": "Inlet temperature"
+      },
+      "outlet_temp": {
+        "name": "Outlet temperature"
+      },
+      "setpoint": {
+        "name": "Setpoint"
+      },
+      "temp_tg": {
+        "name": "Tube temperature Tg"
+      },
+      "temp_tl": {
+        "name": "Liquid tube temperature Tl"
+      },
+      "temp_remote": {
+        "name": "Remote control temperature"
+      },
+      "cooling_upper_limit": {
+        "name": "Cooling upper limit"
+      },
+      "cooling_lower_limit": {
+        "name": "Cooling lower limit"
+      },
+      "heating_upper_limit": {
+        "name": "Heating upper limit"
+      },
+      "heating_lower_limit": {
+        "name": "Heating lower limit"
+      },
+      "expansion_valve_pct": {
+        "name": "Expansion valve"
+      },
+      "required_frequency": {
+        "name": "Required frequency"
+      },
+      "fan_actual": {
+        "name": "Actual fan speed",
+        "state": {
+          "high_high_2": "High-High 2",
+          "high": "High",
+          "medium": "Medium",
+          "medium_low": "Medium-Low",
+          "low": "Low",
+          "mute": "Mute",
+          "breeze": "Breeze"
+        }
+      },
+      "op_state": {
+        "name": "Operating state",
+        "state": {
+          "stop": "Stop",
+          "th_off": "Thermostat off",
+          "th_on": "Thermostat on",
+          "alarm": "Alarm"
+        }
+      },
+      "louver_position": {
+        "name": "Louver position"
+      },
+      "alarm_code": {
+        "name": "Alarm code"
+      },
+      "alarm_description": {
+        "name": "Alarm description"
+      },
+      "shutdown_reason": {
+        "name": "Shutdown reason"
+      },
+      "capacity_code": {
+        "name": "Capacity code"
+      },
+      "remote_control_group": {
+        "name": "Remote control group"
+      },
+      "temp_correction": {
+        "name": "Temperature correction"
+      },
+      "unit_system_number": {
+        "name": "Unit system number"
+      },
+      "unit_address_number": {
+        "name": "Unit address number"
+      },
+      "host_system_number": {
+        "name": "Host system number"
+      },
+      "host_address_number": {
+        "name": "Host address number"
+      },
+      "humidity": {
+        "name": "Humidity"
+      },
+      "mode_jump": {
+        "name": "Mode jump"
+      },
+      "fan_jump": {
+        "name": "Fan jump"
+      },
+      "func_display": {
+        "name": "Function display"
+      },
+      "dry_mode": {
+        "name": "Dry mode",
+        "state": {
+          "dry1": "Dry 1",
+          "dry2": "Dry 2",
+          "dry3": "Dry 3"
+        }
+      },
+      "register_base_address": {
+        "name": "Register base address"
+      },
+      "last_write_status": {
+        "name": "Last write status",
+        "state": {
+          "idle": "Idle",
+          "pending": "Pending",
+          "off_pending": "Pending (unit off)",
+          "confirmed": "Confirmed",
+          "failed": "Failed"
+        }
+      },
+      "ou_model_name": {
+        "name": "Model name"
+      },
+      "ou_run_status": {
+        "name": "Run status"
+      },
+      "ou_protection_info": {
+        "name": "Protection info"
+      },
+      "ou_fan_stage": {
+        "name": "Outdoor fan stage"
+      },
+      "ou_temp_tdo": {
+        "name": "Outdoor Tdo temperature"
+      },
+      "ou_temp_ambient": {
+        "name": "Outdoor ambient temperature"
+      },
+      "ou_pressure_discharge": {
+        "name": "Discharge pressure"
+      },
+      "ou_pressure_suction": {
+        "name": "Suction pressure"
+      },
+      "ou_ev_b": {
+        "name": "Expansion valve EVB"
+      },
+      "ou_ev_j": {
+        "name": "Expansion valve EVJ"
+      },
+      "ou_temp_tsc": {
+        "name": "Subcooling temperature Tsc"
+      },
+      "ou_temp_tchg": {
+        "name": "Temperature Tchg"
+      },
+      "ou_temp_td_avg": {
+        "name": "Average discharge temperature"
+      },
+      "ou_temp_td": {
+        "name": "Discharge temperature Td"
+      },
+      "ou_cumulative_runtime": {
+        "name": "Cumulative runtime"
+      },
+      "ou_current_primary": {
+        "name": "Primary current"
+      },
+      "ou_current_secondary": {
+        "name": "Secondary current"
+      },
+      "ou_inverter_status": {
+        "name": "Inverter status"
+      },
+      "ou_temp_fin": {
+        "name": "FIN temperature"
+      },
+      "ou_freq_actual": {
+        "name": "Actual inverter frequency"
+      },
+      "ou_ev_o": {
+        "name": "Expansion valve EVO"
+      },
+      "ou_temp_te": {
+        "name": "Evaporation temperature Te"
+      },
+      "ou_temp_tg": {
+        "name": "Outdoor temperature Tg"
+      },
+      "ou_fan_status": {
+        "name": "Fan controller status"
+      },
+      "gw_unit_count": {
+        "name": "Connected indoor units"
+      },
+      "gw_eeprom_status": {
+        "name": "EEPROM status"
+      },
+      "b4_filter_cleaning_time": {
+        "name": "EXP B4 Filter cleaning time",
+        "state": {
+          "indoor_std": "Indoor standard",
+          "100h": "100 hours",
+          "1200h": "1200 hours",
+          "2500h": "2500 hours",
+          "no_indication": "No indication",
+          "unknown_5": "Unknown (5)",
+          "unknown_6": "Unknown (6)",
+          "unknown_7": "Unknown (7)",
+          "unknown_8": "Unknown (8)",
+          "unknown_9": "Unknown (9)",
+          "unknown_10": "Unknown (10)",
+          "unknown_11": "Unknown (11)",
+          "unknown_12": "Unknown (12)",
+          "unknown_13": "Unknown (13)",
+          "unknown_14": "Unknown (14)",
+          "unknown_15": "Unknown (15)"
+        }
+      },
+      "c5_indoor_fan_hi_speed": {
+        "name": "EXP C5 Indoor fan Hi speed",
+        "state": {
+          "standard": "Standard",
+          "hi_1": "Hi 1",
+          "hi_2": "Hi 2",
+          "unknown_3": "Unknown (3)"
+        }
+      },
+      "bb_cool_temp_compensation": {
+        "name": "EXP BB Cool temp compensation",
+        "state": {
+          "standard": "Standard",
+          "m1": "Compensation M1",
+          "m2": "Compensation M2",
+          "unknown_3": "Unknown (3)"
+        }
+      }
+    },
+    "binary_sensor": {
+      "running": {
+        "name": "Running"
+      },
+      "alarm": {
+        "name": "Alarm"
+      },
+      "filter_alarm": {
+        "name": "Filter alarm"
+      },
+      "swing_active": {
+        "name": "Swing active"
+      },
+      "oil_return": {
+        "name": "Oil return"
+      },
+      "test_run": {
+        "name": "Test run"
+      },
+      "remote_control_active": {
+        "name": "Remote control active"
+      },
+      "gw_ctrl_mode": {
+        "name": "Modbus control mode"
+      },
+      "gw_alarm_display": {
+        "name": "Gateway alarm"
+      },
+      "b3_compressor_3min_min_op": {
+        "name": "EXP B3 3-min compressor min op"
+      },
+      "c1_cool_only": {
+        "name": "EXP C1 Cool only"
+      },
+      "b2_heat_exchanger": {
+        "name": "EXP B2 Heat exchanger"
+      },
+      "d1_power_supply_on_off_1": {
+        "name": "EXP D1 Power supply on/off 1"
+      },
+      "c3_ha_function": {
+        "name": "EXP C3 HA function"
+      },
+      "b1_heat_temp_comp_removal": {
+        "name": "EXP B1 Heat temp comp removal"
+      },
+      "cool_heat_flag": {
+        "name": "EXP Cool/Heat flag"
+      },
+      "d3_power_supply_on_off_2": {
+        "name": "EXP D3 Power supply on/off 2"
+      },
+      "b5_fixing_op_mode": {
+        "name": "EXP B5 Fixing of op mode"
+      },
+      "b9_fixing_fan_speed": {
+        "name": "EXP B9 Fixing of fan speed"
+      },
+      "c4_drain_pump_heating": {
+        "name": "EXP C4 Drain pump on heating"
+      },
+      "b6_fixing_setting_temp": {
+        "name": "EXP B6 Fixing of setting temp"
+      },
+      "c8_remote_temp_ctrl_1": {
+        "name": "EXP C8 Remote temp ctrl 1"
+      },
+      "b7_fixing_cooling": {
+        "name": "EXP B7 Fixing of cooling"
+      },
+      "b8_auto_cool_heat": {
+        "name": "EXP B8 Auto cool/heat"
+      },
+      "c6_hi_speed_heat_thoff": {
+        "name": "EXP C6 Hi speed @ heat thOFF"
+      },
+      "option_io_config_change": {
+        "name": "EXP Option I/O config change"
+      },
+      "e5_residual_operation_1": {
+        "name": "EXP E5 Residual operation 1"
+      },
+      "e4_precool_preheat_time": {
+        "name": "EXP E4 Precool/preheat time"
+      },
+      "e3_with_humidifier": {
+        "name": "EXP E3 With humidifier"
+      },
+      "e2_op_to_increase_fan_speed": {
+        "name": "EXP E2 Op to increase fan speed"
+      },
+      "e1_air_exchange_mode": {
+        "name": "EXP E1 Air exchange mode"
+      },
+      "c7_cancel_3min_protection": {
+        "name": "EXP C7 Cancel 3-min protection"
+      },
+      "c8_remote_temp_ctrl_2": {
+        "name": "EXP C8 Remote temp ctrl 2"
+      },
+      "cb_forced_stop_logic": {
+        "name": "EXP CB Forced stop logic"
+      },
+      "cc_standby_power": {
+        "name": "EXP CC Standby power"
+      },
+      "be_current_comfort_index_repr": {
+        "name": "EXP BE Current comfort index"
+      },
+      "bc_current_temperature_repr": {
+        "name": "EXP BC Current temperature repr"
+      },
+      "bd_current_humidity_repr": {
+        "name": "EXP BD Current humidity repr"
+      },
+      "d5_prev_heat_discharge_temp_decrease": {
+        "name": "EXP D5 Prev heat discharge temp dn"
+      },
+      "d4_prev_cool_discharge_temp_decrease": {
+        "name": "EXP D4 Prev cool discharge temp dn"
+      },
+      "b1_heating_setting_temp_plus2": {
+        "name": "EXP B1 Heating setting temp +2"
+      },
+      "f1_turn_off_timer_auto_setting": {
+        "name": "EXP F1 Turn-off timer auto setting"
+      },
+      "option_centralized_1": {
+        "name": "EXP Option centralized 1"
+      },
+      "ce_swing_louver_individual": {
+        "name": "EXP CE Swing louver individual"
+      },
+      "cd_thermistor_humidity_sensor_sel": {
+        "name": "EXP CD Thermistor/humidity sensor"
+      },
+      "d6_energy_saving_room_temp_ctrl": {
+        "name": "EXP D6 Energy saving room temp ctrl"
+      },
+      "d7_lift_panel_falling_distance": {
+        "name": "EXP D7 Lift panel falling distance"
+      },
+      "option_clear": {
+        "name": "EXP Option clear"
+      },
+      "ee_auto_fan_speed_mode": {
+        "name": "EXP EE Auto fan speed mode"
+      },
+      "ec_forced_thoff_stop_cooling": {
+        "name": "EXP EC Forced thOFF stop cooling"
+      },
+      "eb_fan_decel_when_cool_heat_off": {
+        "name": "EXP EB Fan decel @ cool/heat off"
+      },
+      "cf_swing_louver_range": {
+        "name": "EXP CF Swing louver range"
+      },
+      "ea_indoor_residual_op_humidifier": {
+        "name": "EXP EA Indoor residual op (humidifier)"
+      },
+      "e8_ghp_function_2": {
+        "name": "EXP E8 GHP function 2"
+      },
+      "e7_ghp_function_1": {
+        "name": "EXP E7 GHP function 1"
+      },
+      "e6_indoor_fan_residual_op_cool_off": {
+        "name": "EXP E6 Indoor fan residual op (cool off)"
+      },
+      "f3_auto_reset_setting_temp": {
+        "name": "EXP F3 Auto reset setting temp"
+      },
+      "f7_wire_controller_stops_delay": {
+        "name": "EXP F7 Wire ctrl stops delay"
+      },
+      "f5_refrigeration_auto_reset_temp": {
+        "name": "EXP F5 Refrigeration auto reset temp"
+      },
+      "f4_auto_reset_time": {
+        "name": "EXP F4 Auto reset time"
+      },
+      "f6_heating_auto_reset_temp": {
+        "name": "EXP F6 Heating auto reset temp"
+      },
+      "fc_cooling_lower_limit_added": {
+        "name": "EXP FC Cooling lower-limit added"
+      },
+      "fd_heating_upper_limit_reduction": {
+        "name": "EXP FD Heating upper-limit reduction"
+      },
+      "fe_auto_operating_temp_heat": {
+        "name": "EXP FE Auto operating temp (heat)"
+      },
+      "ff_lock_on_off_timer": {
+        "name": "EXP FF Lock on/off timer"
+      },
+      "fb_lock_auto": {
+        "name": "EXP Fb Lock auto"
+      },
+      "fa_lock_fan_speed": {
+        "name": "EXP FA Lock fan speed"
+      },
+      "f9_lock_temp_adjustment": {
+        "name": "EXP F9 Lock temp adjustment"
+      },
+      "f8_lock_run_switch": {
+        "name": "EXP F8 Lock run switch"
+      },
+      "in1_get_ready": {
+        "name": "EXP IN1 Get ready"
+      },
+      "in1_remote_cool_warm": {
+        "name": "EXP IN1 Remote cool/warm switch"
+      },
+      "in1_forced_stop": {
+        "name": "EXP IN1 Forced stop"
+      },
+      "in1_remote_start2_stop": {
+        "name": "EXP IN1 Remote start/stop 2 (stop)"
+      },
+      "in1_remote_start2_drive": {
+        "name": "EXP IN1 Remote start/stop 2 (drive)"
+      },
+      "in1_remote_start1": {
+        "name": "EXP IN1 Remote start/stop 1"
+      },
+      "in1_room_temp_ctrl_heating": {
+        "name": "EXP IN1 Room temp ctrl (heating)"
+      },
+      "in1_room_temp_ctrl_cooling": {
+        "name": "EXP IN1 Room temp ctrl (cooling)"
+      },
+      "in2_lifting_grille": {
+        "name": "EXP IN2 Lifting grille"
+      },
+      "in2_remote_cool_warm": {
+        "name": "EXP IN2 Remote cool/warm switch"
+      },
+      "in2_forced_stop": {
+        "name": "EXP IN2 Forced stop"
+      },
+      "in2_remote_start2_stop": {
+        "name": "EXP IN2 Remote start/stop 2 (stop)"
+      },
+      "in2_remote_start2_drive": {
+        "name": "EXP IN2 Remote start/stop 2 (drive)"
+      },
+      "in2_remote_start1": {
+        "name": "EXP IN2 Remote start/stop 1"
+      },
+      "in2_room_temp_ctrl_heating": {
+        "name": "EXP IN2 Room temp ctrl (heating)"
+      },
+      "in2_room_temp_ctrl_cooling": {
+        "name": "EXP IN2 Room temp ctrl (cooling)"
+      },
+      "out1_lifting_grille": {
+        "name": "EXP OUT1 Lifting grille"
+      },
+      "out1_full_heat_exchange": {
+        "name": "EXP OUT1 Full heat exchange"
+      },
+      "out1_heating_thon": {
+        "name": "EXP OUT1 Heating THON"
+      },
+      "out1_heating": {
+        "name": "EXP OUT1 Heating"
+      },
+      "out1_refrigeration_thon": {
+        "name": "EXP OUT1 Refrigeration THON"
+      },
+      "out1_refrigeration": {
+        "name": "EXP OUT1 Refrigeration"
+      },
+      "out1_alarm": {
+        "name": "EXP OUT1 Alarm"
+      },
+      "out1_run": {
+        "name": "EXP OUT1 Run"
+      },
+      "out2_lifting_grille": {
+        "name": "EXP OUT2 Lifting grille"
+      },
+      "out2_full_heat_exchange": {
+        "name": "EXP OUT2 Full heat exchange"
+      },
+      "out2_heating_thon": {
+        "name": "EXP OUT2 Heating THON"
+      },
+      "out2_heating": {
+        "name": "EXP OUT2 Heating"
+      },
+      "out2_refrigeration_thon": {
+        "name": "EXP OUT2 Refrigeration THON"
+      },
+      "out2_refrigeration": {
+        "name": "EXP OUT2 Refrigeration"
+      },
+      "out2_alarm": {
+        "name": "EXP OUT2 Alarm"
+      },
+      "out2_run": {
+        "name": "EXP OUT2 Run"
+      },
+      "out3_get_ready": {
+        "name": "EXP OUT3 Get ready"
+      },
+      "out3_full_heat_exchange": {
+        "name": "EXP OUT3 Full heat exchange"
+      },
+      "out3_heating_thon": {
+        "name": "EXP OUT3 Heating THON"
+      },
+      "out3_heating": {
+        "name": "EXP OUT3 Heating"
+      },
+      "out3_refrigeration_thon": {
+        "name": "EXP OUT3 Refrigeration THON"
+      },
+      "out3_refrigeration": {
+        "name": "EXP OUT3 Refrigeration"
+      },
+      "out3_alarm": {
+        "name": "EXP OUT3 Alarm"
+      },
+      "out3_run": {
+        "name": "EXP OUT3 Run"
+      }
+    },
+    "switch": {
+      "power": {
+        "name": "Power"
+      },
+      "prohibit_on_off": {
+        "name": "Lock on/off button"
+      },
+      "prohibit_mode": {
+        "name": "Lock mode button"
+      },
+      "prohibit_fan": {
+        "name": "Lock fan button"
+      },
+      "prohibit_swing": {
+        "name": "Lock swing button"
+      },
+      "prohibit_temp": {
+        "name": "Lock temperature button"
+      },
+      "gw_alarm_display": {
+        "name": "Gateway alarm display"
+      }
+    },
+    "select": {
+      "louver": {
+        "name": "Louver",
+        "state": {
+          "auto": "Auto",
+          "0": "Position 0",
+          "1": "Position 1",
+          "2": "Position 2",
+          "3": "Position 3",
+          "4": "Position 4",
+          "5": "Position 5",
+          "6": "Position 6",
+          "7": "Position 7"
+        }
+      },
+      "dry_mode_select": {
+        "name": "Dry mode",
+        "state": {
+          "dry1": "Dry 1",
+          "dry2": "Dry 2",
+          "dry3": "Dry 3"
+        }
+      }
+    },
+    "button": {
+      "refresh_all": {
+        "name": "Refresh all units"
+      },
+      "refresh_unit": {
+        "name": "Refresh this unit"
+      },
+      "reset_filter": {
+        "name": "Reset filter alarm"
+      },
+      "lock_all": {
+        "name": "Lock all controls"
+      },
+      "unlock_all": {
+        "name": "Unlock all controls"
+      },
+      "eeprom_clear": {
+        "name": "Clear EEPROM"
+      },
+      "discover_devices": {
+        "name": "Discover devices (reload)"
+      }
+    }
+  }
+}

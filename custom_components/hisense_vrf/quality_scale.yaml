@@ -1,0 +1,104 @@
+rules:
+  # Bronze
+  action-setup:
+    status: exempt
+    comment: |
+      The integration does not register any custom service actions yet.
+  appropriate-polling: done
+  brands:
+    status: exempt
+    comment: |
+      The integration is distributed as a custom_component (HACS-style), not
+      via the Home Assistant core repository. ``home-assistant/brands`` only
+      serves logos for *core* integrations — custom_components must ship their
+      icons locally, which this integration already does under ``brand/``.
+  common-modules: done
+  config-flow: done
+  config-flow-test-coverage: done
+  dependency-transparency: done
+  docs-actions:
+    status: exempt
+    comment: |
+      No custom service actions registered.
+  docs-high-level-description: done
+  docs-installation-instructions: done
+  docs-removal-instructions: done
+  entity-event-setup: done
+  entity-unique-id: done
+  has-entity-name: done
+  runtime-data: done
+  test-before-configure: done
+  test-before-setup: done
+  unique-config-entry: done
+
+  # Silver
+  action-exceptions:
+    status: exempt
+    comment: |
+      No custom service actions registered.
+  config-entry-unloading: done
+  docs-configuration-parameters: done
+  docs-installation-parameters: done
+  entity-unavailable: done
+  integration-owner: done
+  log-when-unavailable: done
+  parallel-updates: done
+  reauthentication-flow:
+    status: exempt
+    comment: |
+      The gateway uses a plain Modbus TCP connection; no authentication is
+      involved, so re-auth has no meaning.
+  test-coverage: done
+
+  # Gold
+  devices: done
+  diagnostics: done
+  discovery:
+    status: exempt
+    comment: |
+      i-Modkit gateways are not discoverable over zeroconf/SSDP.
+  discovery-update-info:
+    status: exempt
+    comment: |
+      See `discovery`.
+  docs-data-update: done
+  docs-examples: done
+  docs-known-limitations: done
+  docs-supported-devices: done
+  docs-supported-functions: done
+  docs-troubleshooting: done
+  docs-use-cases: done
+  dynamic-devices: done
+  entity-category: done
+  entity-device-class:
+    status: done
+    comment: |
+      All entities declare a HA device_class where one applies in the catalog:
+      sensors expose TEMPERATURE/FREQUENCY/CURRENT/DURATION/HUMIDITY/ENUM,
+      binary_sensors expose RUNNING/PROBLEM, switches expose SWITCH. Entities
+      without a device_class (e.g. expansion-valve %, alarm code int, function-
+      selection bits, prohibit lock switches) have no matching class in the
+      HA catalog — their type is too specific to the VRF protocol.
+  entity-disabled-by-default: done
+  entity-translations: done
+  exception-translations:
+    status: exempt
+    comment: |
+      The integration does not raise ``HomeAssistantError`` (or subclasses)
+      from any service action, entity handler, or config flow path. Failures
+      surface as ``persistent_notification`` / repair issues (both already
+      translated) or as ``ModbusReadError`` swallowed by the controller and
+      reported on the ``Last write status`` sensor. There is no user-facing
+      exception text that would need a translation key.
+  icon-translations: done
+  reconfiguration-flow: done
+  repair-issues: done
+  stale-devices: done
+
+  # Platinum
+  async-dependency: done
+  inject-websession:
+    status: exempt
+    comment: |
+      The integration uses Modbus TCP, not HTTP.
+  strict-typing: done

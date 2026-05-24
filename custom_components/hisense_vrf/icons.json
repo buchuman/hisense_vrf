@@ -1,0 +1,577 @@
+{
+  "entity": {
+    "climate": {
+      "ac_unit": {
+        "default": "mdi:air-conditioner"
+      }
+    },
+    "binary_sensor": {
+      "running": {
+        "default": "mdi:power"
+      },
+      "alarm": {
+        "default": "mdi:alert"
+      },
+      "filter_alarm": {
+        "default": "mdi:air-filter"
+      },
+      "swing_active": {
+        "default": "mdi:swap-vertical"
+      },
+      "oil_return": {
+        "default": "mdi:oil"
+      },
+      "test_run": {
+        "default": "mdi:test-tube"
+      },
+      "remote_control_active": {
+        "default": "mdi:remote"
+      },
+      "gw_ctrl_mode": {
+        "default": "mdi:gate"
+      },
+      "gw_alarm_display": {
+        "default": "mdi:led-on"
+      },
+      "b3_compressor_3min_min_op": {
+        "default": "mdi:flask-outline"
+      },
+      "c1_cool_only": {
+        "default": "mdi:flask-outline"
+      },
+      "b2_heat_exchanger": {
+        "default": "mdi:flask-outline"
+      },
+      "d1_power_supply_on_off_1": {
+        "default": "mdi:flask-outline"
+      },
+      "c3_ha_function": {
+        "default": "mdi:flask-outline"
+      },
+      "b1_heat_temp_comp_removal": {
+        "default": "mdi:flask-outline"
+      },
+      "cool_heat_flag": {
+        "default": "mdi:flask-outline"
+      },
+      "d3_power_supply_on_off_2": {
+        "default": "mdi:flask-outline"
+      },
+      "b5_fixing_op_mode": {
+        "default": "mdi:flask-outline"
+      },
+      "b9_fixing_fan_speed": {
+        "default": "mdi:flask-outline"
+      },
+      "c4_drain_pump_heating": {
+        "default": "mdi:flask-outline"
+      },
+      "b6_fixing_setting_temp": {
+        "default": "mdi:flask-outline"
+      },
+      "c8_remote_temp_ctrl_1": {
+        "default": "mdi:flask-outline"
+      },
+      "b7_fixing_cooling": {
+        "default": "mdi:flask-outline"
+      },
+      "b8_auto_cool_heat": {
+        "default": "mdi:flask-outline"
+      },
+      "c6_hi_speed_heat_thoff": {
+        "default": "mdi:flask-outline"
+      },
+      "option_io_config_change": {
+        "default": "mdi:flask-outline"
+      },
+      "e5_residual_operation_1": {
+        "default": "mdi:flask-outline"
+      },
+      "e4_precool_preheat_time": {
+        "default": "mdi:flask-outline"
+      },
+      "e3_with_humidifier": {
+        "default": "mdi:flask-outline"
+      },
+      "e2_op_to_increase_fan_speed": {
+        "default": "mdi:flask-outline"
+      },
+      "e1_air_exchange_mode": {
+        "default": "mdi:flask-outline"
+      },
+      "c7_cancel_3min_protection": {
+        "default": "mdi:flask-outline"
+      },
+      "c8_remote_temp_ctrl_2": {
+        "default": "mdi:flask-outline"
+      },
+      "cb_forced_stop_logic": {
+        "default": "mdi:flask-outline"
+      },
+      "cc_standby_power": {
+        "default": "mdi:flask-outline"
+      },
+      "be_current_comfort_index_repr": {
+        "default": "mdi:flask-outline"
+      },
+      "bc_current_temperature_repr": {
+        "default": "mdi:flask-outline"
+      },
+      "bd_current_humidity_repr": {
+        "default": "mdi:flask-outline"
+      },
+      "d5_prev_heat_discharge_temp_decrease": {
+        "default": "mdi:flask-outline"
+      },
+      "d4_prev_cool_discharge_temp_decrease": {
+        "default": "mdi:flask-outline"
+      },
+      "b1_heating_setting_temp_plus2": {
+        "default": "mdi:flask-outline"
+      },
+      "f1_turn_off_timer_auto_setting": {
+        "default": "mdi:flask-outline"
+      },
+      "option_centralized_1": {
+        "default": "mdi:flask-outline"
+      },
+      "ce_swing_louver_individual": {
+        "default": "mdi:flask-outline"
+      },
+      "cd_thermistor_humidity_sensor_sel": {
+        "default": "mdi:flask-outline"
+      },
+      "d6_energy_saving_room_temp_ctrl": {
+        "default": "mdi:flask-outline"
+      },
+      "d7_lift_panel_falling_distance": {
+        "default": "mdi:flask-outline"
+      },
+      "option_clear": {
+        "default": "mdi:flask-outline"
+      },
+      "ee_auto_fan_speed_mode": {
+        "default": "mdi:flask-outline"
+      },
+      "ec_forced_thoff_stop_cooling": {
+        "default": "mdi:flask-outline"
+      },
+      "eb_fan_decel_when_cool_heat_off": {
+        "default": "mdi:flask-outline"
+      },
+      "cf_swing_louver_range": {
+        "default": "mdi:flask-outline"
+      },
+      "ea_indoor_residual_op_humidifier": {
+        "default": "mdi:flask-outline"
+      },
+      "e8_ghp_function_2": {
+        "default": "mdi:flask-outline"
+      },
+      "e7_ghp_function_1": {
+        "default": "mdi:flask-outline"
+      },
+      "e6_indoor_fan_residual_op_cool_off": {
+        "default": "mdi:flask-outline"
+      },
+      "f3_auto_reset_setting_temp": {
+        "default": "mdi:flask-outline"
+      },
+      "f7_wire_controller_stops_delay": {
+        "default": "mdi:flask-outline"
+      },
+      "f5_refrigeration_auto_reset_temp": {
+        "default": "mdi:flask-outline"
+      },
+      "f4_auto_reset_time": {
+        "default": "mdi:flask-outline"
+      },
+      "f6_heating_auto_reset_temp": {
+        "default": "mdi:flask-outline"
+      },
+      "fc_cooling_lower_limit_added": {
+        "default": "mdi:flask-outline"
+      },
+      "fd_heating_upper_limit_reduction": {
+        "default": "mdi:flask-outline"
+      },
+      "fe_auto_operating_temp_heat": {
+        "default": "mdi:flask-outline"
+      },
+      "ff_lock_on_off_timer": {
+        "default": "mdi:flask-outline"
+      },
+      "fb_lock_auto": {
+        "default": "mdi:flask-outline"
+      },
+      "fa_lock_fan_speed": {
+        "default": "mdi:flask-outline"
+      },
+      "f9_lock_temp_adjustment": {
+        "default": "mdi:flask-outline"
+      },
+      "f8_lock_run_switch": {
+        "default": "mdi:flask-outline"
+      },
+      "in1_get_ready": {
+        "default": "mdi:flask-outline"
+      },
+      "in1_remote_cool_warm": {
+        "default": "mdi:flask-outline"
+      },
+      "in1_forced_stop": {
+        "default": "mdi:flask-outline"
+      },
+      "in1_remote_start2_stop": {
+        "default": "mdi:flask-outline"
+      },
+      "in1_remote_start2_drive": {
+        "default": "mdi:flask-outline"
+      },
+      "in1_remote_start1": {
+        "default": "mdi:flask-outline"
+      },
+      "in1_room_temp_ctrl_heating": {
+        "default": "mdi:flask-outline"
+      },
+      "in1_room_temp_ctrl_cooling": {
+        "default": "mdi:flask-outline"
+      },
+      "in2_lifting_grille": {
+        "default": "mdi:flask-outline"
+      },
+      "in2_remote_cool_warm": {
+        "default": "mdi:flask-outline"
+      },
+      "in2_forced_stop": {
+        "default": "mdi:flask-outline"
+      },
+      "in2_remote_start2_stop": {
+        "default": "mdi:flask-outline"
+      },
+      "in2_remote_start2_drive": {
+        "default": "mdi:flask-outline"
+      },
+      "in2_remote_start1": {
+        "default": "mdi:flask-outline"
+      },
+      "in2_room_temp_ctrl_heating": {
+        "default": "mdi:flask-outline"
+      },
+      "in2_room_temp_ctrl_cooling": {
+        "default": "mdi:flask-outline"
+      },
+      "out1_lifting_grille": {
+        "default": "mdi:flask-outline"
+      },
+      "out1_full_heat_exchange": {
+        "default": "mdi:flask-outline"
+      },
+      "out1_heating_thon": {
+        "default": "mdi:flask-outline"
+      },
+      "out1_heating": {
+        "default": "mdi:flask-outline"
+      },
+      "out1_refrigeration_thon": {
+        "default": "mdi:flask-outline"
+      },
+      "out1_refrigeration": {
+        "default": "mdi:flask-outline"
+      },
+      "out1_alarm": {
+        "default": "mdi:flask-outline"
+      },
+      "out1_run": {
+        "default": "mdi:flask-outline"
+      },
+      "out2_lifting_grille": {
+        "default": "mdi:flask-outline"
+      },
+      "out2_full_heat_exchange": {
+        "default": "mdi:flask-outline"
+      },
+      "out2_heating_thon": {
+        "default": "mdi:flask-outline"
+      },
+      "out2_heating": {
+        "default": "mdi:flask-outline"
+      },
+      "out2_refrigeration_thon": {
+        "default": "mdi:flask-outline"
+      },
+      "out2_refrigeration": {
+        "default": "mdi:flask-outline"
+      },
+      "out2_alarm": {
+        "default": "mdi:flask-outline"
+      },
+      "out2_run": {
+        "default": "mdi:flask-outline"
+      },
+      "out3_get_ready": {
+        "default": "mdi:flask-outline"
+      },
+      "out3_full_heat_exchange": {
+        "default": "mdi:flask-outline"
+      },
+      "out3_heating_thon": {
+        "default": "mdi:flask-outline"
+      },
+      "out3_heating": {
+        "default": "mdi:flask-outline"
+      },
+      "out3_refrigeration_thon": {
+        "default": "mdi:flask-outline"
+      },
+      "out3_refrigeration": {
+        "default": "mdi:flask-outline"
+      },
+      "out3_alarm": {
+        "default": "mdi:flask-outline"
+      },
+      "out3_run": {
+        "default": "mdi:flask-outline"
+      }
+    },
+    "sensor": {
+      "inlet_temp": {
+        "default": "mdi:thermometer"
+      },
+      "outlet_temp": {
+        "default": "mdi:thermometer"
+      },
+      "setpoint": {
+        "default": "mdi:thermometer-check"
+      },
+      "temp_tg": {
+        "default": "mdi:thermometer-lines"
+      },
+      "temp_tl": {
+        "default": "mdi:thermometer-water"
+      },
+      "temp_remote": {
+        "default": "mdi:thermometer"
+      },
+      "cooling_upper_limit": {
+        "default": "mdi:thermometer-chevron-up"
+      },
+      "cooling_lower_limit": {
+        "default": "mdi:thermometer-chevron-down"
+      },
+      "heating_upper_limit": {
+        "default": "mdi:thermometer-chevron-up"
+      },
+      "heating_lower_limit": {
+        "default": "mdi:thermometer-chevron-down"
+      },
+      "expansion_valve_pct": {
+        "default": "mdi:valve"
+      },
+      "required_frequency": {
+        "default": "mdi:sine-wave"
+      },
+      "fan_actual": {
+        "default": "mdi:fan"
+      },
+      "op_state": {
+        "default": "mdi:state-machine"
+      },
+      "louver_position": {
+        "default": "mdi:tailwind"
+      },
+      "alarm_code": {
+        "default": "mdi:alert-octagon"
+      },
+      "alarm_description": {
+        "default": "mdi:message-alert"
+      },
+      "shutdown_reason": {
+        "default": "mdi:power-off"
+      },
+      "capacity_code": {
+        "default": "mdi:gauge"
+      },
+      "remote_control_group": {
+        "default": "mdi:group"
+      },
+      "temp_correction": {
+        "default": "mdi:thermometer-plus"
+      },
+      "unit_system_number": {
+        "default": "mdi:identifier"
+      },
+      "unit_address_number": {
+        "default": "mdi:identifier"
+      },
+      "host_system_number": {
+        "default": "mdi:identifier"
+      },
+      "host_address_number": {
+        "default": "mdi:identifier"
+      },
+      "humidity": {
+        "default": "mdi:water-percent"
+      },
+      "mode_jump": {
+        "default": "mdi:swap-horizontal"
+      },
+      "fan_jump": {
+        "default": "mdi:fan-auto"
+      },
+      "func_display": {
+        "default": "mdi:format-list-bulleted"
+      },
+      "dry_mode": {
+        "default": "mdi:water-off"
+      },
+      "register_base_address": {
+        "default": "mdi:numeric"
+      },
+      "last_write_status": {
+        "default": "mdi:upload"
+      },
+      "ou_model_name": {
+        "default": "mdi:tag-text"
+      },
+      "ou_run_status": {
+        "default": "mdi:state-machine"
+      },
+      "ou_protection_info": {
+        "default": "mdi:shield-alert"
+      },
+      "ou_fan_stage": {
+        "default": "mdi:fan"
+      },
+      "ou_temp_tdo": {
+        "default": "mdi:thermometer"
+      },
+      "ou_temp_ambient": {
+        "default": "mdi:home-thermometer-outline"
+      },
+      "ou_pressure_discharge": {
+        "default": "mdi:gauge"
+      },
+      "ou_pressure_suction": {
+        "default": "mdi:gauge"
+      },
+      "ou_ev_b": {
+        "default": "mdi:valve"
+      },
+      "ou_ev_j": {
+        "default": "mdi:valve"
+      },
+      "ou_temp_tsc": {
+        "default": "mdi:thermometer-low"
+      },
+      "ou_temp_tchg": {
+        "default": "mdi:thermometer"
+      },
+      "ou_temp_td_avg": {
+        "default": "mdi:thermometer-high"
+      },
+      "ou_temp_td": {
+        "default": "mdi:thermometer-high"
+      },
+      "ou_cumulative_runtime": {
+        "default": "mdi:timer-outline"
+      },
+      "ou_current_primary": {
+        "default": "mdi:current-ac"
+      },
+      "ou_current_secondary": {
+        "default": "mdi:current-ac"
+      },
+      "ou_inverter_status": {
+        "default": "mdi:sine-wave"
+      },
+      "ou_temp_fin": {
+        "default": "mdi:radiator"
+      },
+      "ou_freq_actual": {
+        "default": "mdi:sine-wave"
+      },
+      "ou_ev_o": {
+        "default": "mdi:valve"
+      },
+      "ou_temp_te": {
+        "default": "mdi:thermometer-low"
+      },
+      "ou_temp_tg": {
+        "default": "mdi:thermometer-lines"
+      },
+      "ou_fan_status": {
+        "default": "mdi:fan-chevron-up"
+      },
+      "gw_unit_count": {
+        "default": "mdi:counter"
+      },
+      "gw_eeprom_status": {
+        "default": "mdi:memory"
+      },
+      "b4_filter_cleaning_time": {
+        "default": "mdi:flask-outline"
+      },
+      "c5_indoor_fan_hi_speed": {
+        "default": "mdi:flask-outline"
+      },
+      "bb_cool_temp_compensation": {
+        "default": "mdi:flask-outline"
+      }
+    },
+    "switch": {
+      "power": {
+        "default": "mdi:power"
+      },
+      "prohibit_on_off": {
+        "default": "mdi:lock"
+      },
+      "prohibit_mode": {
+        "default": "mdi:lock"
+      },
+      "prohibit_fan": {
+        "default": "mdi:lock"
+      },
+      "prohibit_swing": {
+        "default": "mdi:lock"
+      },
+      "prohibit_temp": {
+        "default": "mdi:lock"
+      },
+      "gw_alarm_display": {
+        "default": "mdi:led-on"
+      }
+    },
+    "select": {
+      "louver": {
+        "default": "mdi:tailwind"
+      },
+      "dry_mode_select": {
+        "default": "mdi:water-off"
+      }
+    },
+    "button": {
+      "refresh_all": {
+        "default": "mdi:refresh"
+      },
+      "refresh_unit": {
+        "default": "mdi:refresh"
+      },
+      "reset_filter": {
+        "default": "mdi:air-filter"
+      },
+      "lock_all": {
+        "default": "mdi:lock"
+      },
+      "unlock_all": {
+        "default": "mdi:lock-open"
+      },
+      "eeprom_clear": {
+        "default": "mdi:eraser"
+      },
+      "discover_devices": {
+        "default": "mdi:magnify-scan"
+      }
+    }
+  }
+}

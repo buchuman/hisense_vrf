@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Concept B — Hisense VRF icon
+"Snowflake + Bus network"
+
+A six-pointed snowflake at the centre, with small dots at each branch tip
+joined by straight lines forming a hexagon — evoking the VRF refrigerant
+loop AND the Modbus daisy-chain at once. Cleaner / more "technical" than A.
+
+Color palette:
+  - Background:   #0E3A4E (very dark teal — high contrast)
+  - Snowflake:    #FFFFFF (white)
+  - Nodes/links:  #4CC3D9 (bright cyan, cold accent)
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <rect x="0" y="0" width="256" height="256" rx="48" fill="#0E3A4E"/>
+
+  <!-- Hexagonal connection network (drawn first so snowflake sits on top) -->
+  <g stroke="#4CC3D9" stroke-width="3" fill="none">
+    <polygon points="128,40 200,82 200,174 128,216 56,174 56,82" stroke-linejoin="round"/>
+  </g>
+  <g fill="#4CC3D9">
+    <circle cx="128" cy="40" r="9"/>
+    <circle cx="200" cy="82" r="9"/>
+    <circle cx="200" cy="174" r="9"/>
+    <circle cx="128" cy="216" r="9"/>
+    <circle cx="56" cy="174" r="9"/>
+    <circle cx="56" cy="82" r="9"/>
+  </g>
+
+  <!-- Central snowflake (6-fold symmetry, classic line glyph) -->
+  <g stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" fill="none">
+    <!-- 3 main axes -->
+    <line x1="128" y1="68" x2="128" y2="188"/>
+    <line x1="76" y1="98" x2="180" y2="158"/>
+    <line x1="76" y1="158" x2="180" y2="98"/>
+  </g>
+  <!-- Snowflake arrow tips (V-shapes at each end) -->
+  <g stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" fill="none">
+    <!-- top -->
+    <path d="M 118 80 L 128 70 L 138 80"/>
+    <!-- bottom -->
+    <path d="M 118 176 L 128 186 L 138 176"/>
+    <!-- upper-left -->
+    <path d="M 80 110 L 76 96 L 92 100"/>
+    <!-- lower-right -->
+    <path d="M 164 146 L 180 156 L 176 142"/>
+    <!-- upper-right -->
+    <path d="M 164 110 L 180 100 L 176 116"/>
+    <!-- lower-left -->
+    <path d="M 80 146 L 76 160 L 92 156"/>
+  </g>
+  <!-- Center dot -->
+  <circle cx="128" cy="128" r="6" fill="#FFFFFF"/>
+</svg>

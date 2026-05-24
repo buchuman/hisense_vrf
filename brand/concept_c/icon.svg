@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Concept C — Hisense VRF icon
+"Outdoor unit + indoor bus"
+
+A stylised outdoor compressor unit on top (rectangle with horizontal louvers
+inside a fan circle), connected by a refrigerant line to a daisy-chain of
+indoor units at the bottom. Tells the whole VRF story in one glyph.
+
+Color palette:
+  - Background:    #2D2D44 (slate / night)
+  - Outdoor unit:  #5DA9E9 (sky blue)
+  - Refrigerant:   #FFC857 (yellow — heat exchange)
+  - Indoor units:  #FFFFFF (white)
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <rect x="0" y="0" width="256" height="256" rx="48" fill="#2D2D44"/>
+
+  <!-- Outdoor unit body (upper part) -->
+  <rect x="68" y="32" width="120" height="76" rx="10" fill="#5DA9E9"/>
+
+  <!-- Outdoor fan (circle with cross blades) -->
+  <circle cx="128" cy="70" r="26" fill="#2D2D44"/>
+  <g stroke="#5DA9E9" stroke-width="5" stroke-linecap="round">
+    <line x1="128" y1="48" x2="128" y2="92"/>
+    <line x1="106" y1="70" x2="150" y2="70"/>
+    <line x1="111" y1="53" x2="145" y2="87"/>
+    <line x1="111" y1="87" x2="145" y2="53"/>
+  </g>
+  <circle cx="128" cy="70" r="4" fill="#5DA9E9"/>
+
+  <!-- Refrigerant line going down -->
+  <line x1="128" y1="108" x2="128" y2="140" stroke="#FFC857" stroke-width="5" stroke-linecap="round"/>
+  <!-- T-junction -->
+  <line x1="56" y1="140" x2="200" y2="140" stroke="#FFC857" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- Three indoor units along the bus -->
+  <g fill="#FFFFFF">
+    <rect x="40" y="156" width="48" height="40" rx="6"/>
+    <rect x="104" y="156" width="48" height="40" rx="6"/>
+    <rect x="168" y="156" width="48" height="40" rx="6"/>
+  </g>
+
+  <!-- Vents inside each indoor unit -->
+  <g fill="#2D2D44">
+    <rect x="48" y="166" width="32" height="3" rx="1.5"/>
+    <rect x="48" y="173" width="32" height="3" rx="1.5"/>
+    <rect x="48" y="180" width="32" height="3" rx="1.5"/>
+    <rect x="112" y="166" width="32" height="3" rx="1.5"/>
+    <rect x="112" y="173" width="32" height="3" rx="1.5"/>
+    <rect x="112" y="180" width="32" height="3" rx="1.5"/>
+    <rect x="176" y="166" width="32" height="3" rx="1.5"/>
+    <rect x="176" y="173" width="32" height="3" rx="1.5"/>
+    <rect x="176" y="180" width="32" height="3" rx="1.5"/>
+  </g>
+
+  <!-- Bus connection drops -->
+  <line x1="64" y1="140" x2="64" y2="156" stroke="#FFC857" stroke-width="3" stroke-linecap="round"/>
+  <line x1="128" y1="140" x2="128" y2="156" stroke="#FFC857" stroke-width="3" stroke-linecap="round"/>
+  <line x1="192" y1="140" x2="192" y2="156" stroke="#FFC857" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Status LEDs on each indoor (signal alive) -->
+  <g fill="#4CC3D9">
+    <circle cx="80" cy="190" r="2"/>
+    <circle cx="144" cy="190" r="2"/>
+    <circle cx="208" cy="190" r="2"/>
+  </g>
+</svg>

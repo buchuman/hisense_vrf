@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Concept A — Hisense VRF icon
+"Indoor unit + Modbus connection"
+
+A simplified wall-mounted AC unit (rounded rectangle with 3 air vents) on a
+deep teal background, with a small wired-network glyph in the lower-right
+corner suggesting the Modbus connection. Minimalist, Material-Design-style,
+fully geometric — no trademarked imagery.
+
+Color palette:
+  - Background:   #1B5E66 (deep teal — evokes "cold air")
+  - AC body:      #FFFFFF (white)
+  - Air vents:    #1B5E66 (background color, "cut-out" look)
+  - Air streams:  #B8E2EA (light cyan)
+  - Net glyph:    #FFC857 (warm yellow — high contrast accent)
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- Background tile -->
+  <rect x="0" y="0" width="256" height="256" rx="48" fill="#1B5E66"/>
+
+  <!-- AC indoor unit body -->
+  <rect x="48" y="76" width="160" height="72" rx="12" fill="#FFFFFF"/>
+
+  <!-- Three air vents (carved into body) -->
+  <rect x="64" y="92" width="128" height="6" rx="3" fill="#1B5E66"/>
+  <rect x="64" y="108" width="128" height="6" rx="3" fill="#1B5E66"/>
+  <rect x="64" y="124" width="128" height="6" rx="3" fill="#1B5E66"/>
+
+  <!-- Bottom lip / air outlet -->
+  <rect x="48" y="148" width="160" height="8" rx="4" fill="#B8E2EA"/>
+
+  <!-- Air streams flowing down -->
+  <path d="M 78 168 Q 78 184 88 196 Q 98 208 88 220" stroke="#B8E2EA" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M 128 168 Q 128 184 138 196 Q 148 208 138 220" stroke="#B8E2EA" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M 178 168 Q 178 184 188 196 Q 198 208 188 220" stroke="#B8E2EA" stroke-width="4" fill="none" stroke-linecap="round"/>
+
+  <!-- Modbus connection node (top-left) -->
+  <circle cx="64" cy="48" r="10" fill="#FFC857"/>
+  <circle cx="96" cy="48" r="6" fill="#FFC857"/>
+  <circle cx="124" cy="48" r="6" fill="#FFC857"/>
+  <line x1="64" y1="48" x2="124" y2="48" stroke="#FFC857" stroke-width="3"/>
+  <line x1="64" y1="58" x2="64" y2="76" stroke="#FFC857" stroke-width="3"/>
+</svg>

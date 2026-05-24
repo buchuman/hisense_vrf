@@ -1,0 +1,12 @@
+{
+    "domain": "hisense_vrf",
+    "name": "Hisense VRF",
+    "codeowners": ["@buchuman"],
+    "config_flow": true,
+    "documentation": "https://github.com/buchuman/hisense_vrf",
+    "integration_type": "hub",
+    "iot_class": "local_polling",
+    "quality_scale": "platinum",
+    "requirements": [],
+    "version": "1.0.0"
+}
