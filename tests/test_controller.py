@@ -687,16 +687,22 @@ async def test_resolve_user_unknown_user_id(scanned_controller):
 async def test_dynamic_rescan_adds_new_indoor_unit(scanned_controller, mock_client):
     """When unit_count changes, a rescan picks up the new unit and dispatches a signal."""
     from custom_components.hisense_vrf.const import signal_new_indoor
+    from homeassistant.core import callback
     from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
     assert scanned_controller.unit_indices == [0, 1]
     assert scanned_controller._last_known_unit_count == 2
 
     received: list[int] = []
+
+    @callback
+    def _capture(idx: int) -> None:
+        received.append(idx)
+
     async_dispatcher_connect(
         scanned_controller.hass,
         signal_new_indoor("test_entry_id"),
-        lambda idx: received.append(idx),
+        _capture,
     )
 
     # Gateway now reports 3 units; scan returns [0, 1, 2].
@@ -706,6 +712,7 @@ async def test_dynamic_rescan_adds_new_indoor_unit(scanned_controller, mock_clie
     mock_client.read_unit_capacity.return_value = 22
 
     await scanned_controller._read_and_track_gateway()
+    await scanned_controller.hass.async_block_till_done()
 
     assert 2 in scanned_controller.unit_indices
     assert scanned_controller.unit_identifiers[2] == (0, 2)
@@ -724,13 +731,19 @@ async def test_dynamic_rescan_no_op_when_count_unchanged(scanned_controller, moc
 async def test_dynamic_rescan_adds_new_outdoor_module(scanned_controller, mock_client):
     """A second outdoor module appearing in read_outdoor_connections is picked up."""
     from custom_components.hisense_vrf.const import signal_new_outdoor
+    from homeassistant.core import callback
     from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
     received: list[tuple[int, int]] = []
+
+    @callback
+    def _capture(ou: tuple[int, int]) -> None:
+        received.append(ou)
+
     async_dispatcher_connect(
         scanned_controller.hass,
         signal_new_outdoor("test_entry_id"),
-        lambda ou: received.append(ou),
+        _capture,
     )
 
     # Indoor count changes (forces rescan) and outdoor now has 2 modules.
@@ -739,6 +752,7 @@ async def test_dynamic_rescan_adds_new_outdoor_module(scanned_controller, mock_c
     mock_client.read_outdoor_connections.return_value = [(0, 0), (1, 0)]
 
     await scanned_controller._read_and_track_gateway()
+    await scanned_controller.hass.async_block_till_done()
 
     assert (1, 0) in scanned_controller.outdoor_units
     assert received == [(1, 0)]
