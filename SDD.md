@@ -363,11 +363,19 @@ Trade-off: if a unit's physical address changes, the entity_id doesn't migrate a
 
 The gateway typically responds in <500 ms. The default 3 s was overly conservative for our use case, multiplying setup worst-case. 1.5 s leaves ~3× safety margin. If spurious `ModbusReadError` start showing up in normal operation, bumping it back up is the simplest fix.
 
-### 5.7 `pyacmodbus` bundling
+### 5.7 `pyacmodbus` as a PyPI dependency
 
-`pyacmodbus` is not on PyPI. For HA OS production, the library is copied inside `custom_components/hisense_vrf/pyacmodbus/`. The integration's `__init__.py` uses `importlib.util.spec_from_file_location` to load it by path **without touching `sys.path`** (this avoids shadowing stdlib modules like `select`).
+Since v1.1.0, `pyacmodbus` is [published on PyPI](https://pypi.org/project/pyacmodbus/) and declared as a standard requirement in `manifest.json`:
 
-Trade-off: every deploy copies two paths. The manifest **does not** declare `requirements=["pyacmodbus"]` because that triggers a PyPI install that fails. If the library is ever published, the bundle goes away and the requirement becomes standard.
+```json
+"requirements": ["pyacmodbus>=1.0.0"]
+```
+
+Home Assistant installs the library automatically on the first load of the config entry. The integration's `__init__.py` imports it with a plain `from pyacmodbus import ...` — no bundling, no `sys.path` tricks.
+
+The standalone library code lives in `pyacmodbus-stub/` in the repo (used during local development and packaging). The CI workflow `.github/workflows/publish-pyacmodbus.yml` publishes new versions to PyPI via [OIDC trusted publishing](https://docs.pypi.org/trusted-publishers/) whenever a GitHub release is published.
+
+Historical note: versions ≤ v1.0.0 bundled the library inside the integration directory and loaded it via `importlib.util.spec_from_file_location`. That workaround avoided pip-installing from a non-existent PyPI project; it's gone in v1.1.0.
 
 ### 5.8 Strict typing with 3 exceptions
 

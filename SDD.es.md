@@ -363,11 +363,19 @@ Trade-off: si la unit cambia de address físico, el entity_id no migra solo — 
 
 El gateway típicamente responde en <500 ms. El default de 3 s era demasiado conservador para nuestro caso, multiplicando el peor caso del setup. 1.5 s deja ~3× safety margin. Si aparecen errores espurios `ModbusReadError` en operación normal, conviene volver a subir.
 
-### 5.7 Bundling de `pyacmodbus`
+### 5.7 `pyacmodbus` como dependencia PyPI
 
-`pyacmodbus` no está en PyPI. Para HA OS prod, la librería se copia adentro de `custom_components/hisense_vrf/pyacmodbus/`. El `__init__.py` de la integración usa `importlib.util.spec_from_file_location` para cargarla por path **sin tocar `sys.path`** (esto evitaba shadowing de stdlib como `select`).
+Desde v1.1.0, `pyacmodbus` está [publicado en PyPI](https://pypi.org/project/pyacmodbus/) y declarado como requirement estándar en `manifest.json`:
 
-Trade-off: cada deploy implica copiar dos paths. El manifest **NO** declara `requirements=["pyacmodbus"]` porque eso intenta instalar desde PyPI y falla. Si en el futuro la librería se publica, se borra el bundle y se usa requirements normal.
+```json
+"requirements": ["pyacmodbus>=1.0.0"]
+```
+
+Home Assistant instala la librería automáticamente al cargar el config entry por primera vez. El `__init__.py` de la integración la importa con un `from pyacmodbus import ...` normal — sin bundle, sin trucos de `sys.path`.
+
+El código de la librería standalone vive en `pyacmodbus-stub/` en el repo (usado durante desarrollo local y para empaquetar). El workflow CI `.github/workflows/publish-pyacmodbus.yml` publica versiones nuevas a PyPI vía [OIDC trusted publishing](https://docs.pypi.org/trusted-publishers/) cada vez que se publica una release de GitHub.
+
+Nota histórica: las versiones ≤ v1.0.0 bundleaban la librería adentro del directorio de la integración y la cargaban con `importlib.util.spec_from_file_location`. Ese workaround evitaba pip-install desde un proyecto PyPI inexistente; se eliminó en v1.1.0.
 
 ### 5.8 Strict typing con 3 excepciones
 

@@ -7,6 +7,6 @@
     "integration_type": "hub",
     "iot_class": "local_polling",
     "quality_scale": "platinum",
-    "requirements": [],
-    "version": "1.0.0"
+    "requirements": ["pyacmodbus>=1.0.0"],
+    "version": "1.1.0"
 }

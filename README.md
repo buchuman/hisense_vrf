@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/buchuman/hisense_vrf/actions/workflows/test.yml/badge.svg)](https://github.com/buchuman/hisense_vrf/actions/workflows/test.yml)
 [![quality-scale](https://img.shields.io/badge/quality__scale-platinum-9c27b0)](https://developers.home-assistant.io/docs/core/integration-quality-scale)
-[![version](https://img.shields.io/badge/version-1.0.0-blue)](custom_components/hisense_vrf/manifest.json)
+[![version](https://img.shields.io/badge/version-1.1.0-blue)](custom_components/hisense_vrf/manifest.json)
 [![license: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Home Assistant custom integration to control Hisense VRF indoor units through an **i-Modkit Modbus TCP gateway** (model `HCPC-H2M1C`).
@@ -43,7 +43,7 @@ The integration meets every applicable rule of the Home Assistant [Integration Q
 
 ## Installation
 
-> This integration is not on HACS yet — install manually via the steps below. The `pyacmodbus` Modbus client is bundled inside the integration, so no PyPI dependency is needed.
+> This integration is not on HACS yet — install manually via the steps below. The Modbus client lives in [`pyacmodbus`](https://pypi.org/project/pyacmodbus/) on PyPI and is declared as a `requirements` of the integration, so Home Assistant installs it automatically on first load.
 
 ### Manual install
 
@@ -58,15 +58,14 @@ The integration meets every applicable rule of the Home Assistant [Integration Q
    mkdir -p <config>/custom_components
    ```
 
-3. Clone the repo to a temporary location and copy the integration into `custom_components/`. The second `cp` bundles the `pyacmodbus` library inside the integration directory:
+3. Clone the repo to a temporary location and copy the integration into `custom_components/`:
 
    ```bash
    git clone https://github.com/buchuman/hisense_vrf.git
    cp -r hisense_vrf/custom_components/hisense_vrf <config>/custom_components/
-   cp -r hisense_vrf/pyacmodbus-stub/pyacmodbus  <config>/custom_components/hisense_vrf/
    ```
 
-4. Restart Home Assistant (Settings → System → Restart).
+4. Restart Home Assistant (Settings → System → Restart). On first load HA will install `pyacmodbus` from PyPI automatically (no manual `pip` step).
 
 5. Add the integration: **Settings → Devices & Services → Add Integration → Hisense VRF**. Provide the IP / hostname and TCP port (default `502`) of your i-Modkit gateway.
 
@@ -76,7 +75,6 @@ Repeat steps 3-4 above (the `cp -r` overwrites in place), then either:
 
 - **Reload** from **Settings → Devices & Services → Hisense VRF → ⋮ → Reload**, or
 - If the reload doesn't pick up the change, delete `<config>/custom_components/hisense_vrf/__pycache__/` and try again — Python caches the previous module.
-- For changes inside `pyacmodbus/`, the cache is stickier; do a full HA restart.
 
 ## Use cases
 

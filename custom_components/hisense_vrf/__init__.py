@@ -1,36 +1,7 @@
 """Hisense VRF — Home Assistant integration for i-Modkit Modbus TCP gateways."""
 from __future__ import annotations
 
-import importlib.util
 import logging
-import os
-import sys
-
-
-def _ensure_pyacmodbus_loaded() -> None:
-    """Load bundled pyacmodbus if it isn't already importable from site-packages.
-
-    The library is loaded by file path so we don't touch ``sys.path`` —
-    prepending the custom-component directory there would shadow stdlib
-    modules like ``select`` with our own platform files.
-    """
-    try:
-        import pyacmodbus  # noqa: F401
-        return
-    except ImportError:
-        pass
-    bundle = os.path.join(os.path.dirname(__file__), "pyacmodbus", "__init__.py")
-    if not os.path.isfile(bundle):
-        raise
-    spec = importlib.util.spec_from_file_location("pyacmodbus", bundle)
-    if spec is None or spec.loader is None:
-        raise ImportError("Failed to load bundled pyacmodbus")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["pyacmodbus"] = module
-    spec.loader.exec_module(module)
-
-
-_ensure_pyacmodbus_loaded()
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT

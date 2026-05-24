@@ -4,6 +4,18 @@ All notable changes to the Hisense VRF integration are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] — 2026-05-24
+
+### Changed
+
+- **`pyacmodbus` is now a PyPI dependency** instead of a bundled library. `manifest.json` declares `"requirements": ["pyacmodbus>=1.0.0"]`; Home Assistant installs the library automatically on first load.
+- `__init__.py` no longer ships the `_ensure_pyacmodbus_loaded()` helper nor any `importlib.util.spec_from_file_location` machinery — it's a plain `from pyacmodbus import ...` now.
+- Install instructions in the README are simplified: only the integration directory needs to be copied to `custom_components/`. No more secondary `cp` for the library.
+
+### Removed
+
+- The bundled `pyacmodbus/` subdirectory inside `custom_components/hisense_vrf/`. The library code still lives in `pyacmodbus-stub/` in the repo (used for local dev and packaging) but is no longer copied into the integration at deploy time.
+
 ## [1.0.0] — 2026-05-24
 
 First public release. Quality scale: **Platinum** (highest tier).
@@ -35,4 +47,5 @@ First public release. Quality scale: **Platinum** (highest tier).
 - The `pyacmodbus` library is bundled inside `custom_components/hisense_vrf/` because it is not on PyPI yet. The integration loads it via `importlib.util.spec_from_file_location` without touching `sys.path` (avoids shadowing stdlib modules like `select`).
 - `EXP*` entities default to `disabled_by_default=True`. They're available but hidden until the user opts in from Settings → Devices → entity.
 
+[1.1.0]: https://github.com/buchuman/hisense_vrf/releases/tag/v1.1.0
 [1.0.0]: https://github.com/buchuman/hisense_vrf/releases/tag/v1.0.0
