@@ -4,6 +4,19 @@ All notable changes to the Hisense VRF integration are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] — 2026-05-24
+
+### Added
+
+- `hacs.json` declaring the integration to the HACS default repository.
+- `issue_tracker` URL in the manifest (required by HACS validation).
+
+### Changed
+
+- Manifest keys reordered alphabetically after `domain` + `name` (required by `hassfest`).
+
+This is a packaging-only release: no runtime behaviour change vs 1.1.0. The version bump is needed because the HACS bot validates the latest release tag, not `main` — and the HACS-required fixes landed on `main` after 1.1.0 was tagged.
+
 ## [1.1.0] — 2026-05-24
 
 ### Changed
@@ -47,5 +60,6 @@ First public release. Quality scale: **Platinum** (highest tier).
 - The `pyacmodbus` library is bundled inside `custom_components/hisense_vrf/` because it is not on PyPI yet. The integration loads it via `importlib.util.spec_from_file_location` without touching `sys.path` (avoids shadowing stdlib modules like `select`).
 - `EXP*` entities default to `disabled_by_default=True`. They're available but hidden until the user opts in from Settings → Devices → entity.
 
+[1.1.1]: https://github.com/buchuman/hisense_vrf/releases/tag/v1.1.1
 [1.1.0]: https://github.com/buchuman/hisense_vrf/releases/tag/v1.1.0
 [1.0.0]: https://github.com/buchuman/hisense_vrf/releases/tag/v1.0.0

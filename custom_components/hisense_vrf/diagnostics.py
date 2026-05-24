@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import asdict, is_dataclass
 from typing import Any
 
+import pyacmodbus
 from homeassistant.core import HomeAssistant
 
 from . import HisenseVRFConfigEntry
@@ -36,6 +37,10 @@ async def async_get_config_entry_diagnostics(
     """Return a JSON-serialisable snapshot of the integration state."""
     controller = entry.runtime_data
     return {
+        "pyacmodbus": {
+            "file": pyacmodbus.__file__,
+            "version": getattr(pyacmodbus, "__version__", "(no __version__ attr)"),
+        },
         "entry": {
             "data": dict(entry.data),
             "options": dict(entry.options),
