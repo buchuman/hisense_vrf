@@ -43,38 +43,40 @@ The integration meets every applicable rule of the Home Assistant [Integration Q
 
 ## Installation
 
-### Quick install via custom_components symlink (dev)
+> This integration is not on HACS yet — install manually via the steps below. The `pyacmodbus` Modbus client is bundled inside the integration, so no PyPI dependency is needed.
 
-If you have the Home Assistant `config/` directory directly accessible (e.g. local dev setup), symlink the integration:
+### Manual install
 
-```bash
-ln -sfn /path/to/homeassistant-v2/custom_components/hisense_vrf \
-        /path/to/ha_config/custom_components/hisense_vrf
-```
+1. Locate your Home Assistant `config/` directory:
+   - **HA OS / Supervised:** `/config` inside the host. Access it via the [Samba](https://www.home-assistant.io/integrations/samba/), [SSH](https://www.home-assistant.io/integrations/ssh/), [File Editor](https://github.com/home-assistant/addons/tree/master/configurator) or [Studio Code Server](https://github.com/hassio-addons/addon-vscode) add-ons.
+   - **HA Container:** the volume you mounted as `/config`.
+   - **HA Core (venv):** the directory passed to `hass --config`.
 
-And install the `pyacmodbus` library in your HA Python environment:
+2. Make sure the `custom_components/` directory exists:
 
-```bash
-pip install -e /path/to/homeassistant-v2/pyacmodbus-stub/
-```
+   ```bash
+   mkdir -p <config>/custom_components
+   ```
 
-Restart Home Assistant. The integration appears under **Settings → Devices & Services → Add Integration → Hisense VRF**.
+3. Clone the repo to a temporary location and copy the integration into `custom_components/`. The second `cp` bundles the `pyacmodbus` library inside the integration directory:
 
-### HA OS production deploy (with bundling)
+   ```bash
+   git clone https://github.com/buchuman/hisense_vrf.git
+   cp -r hisense_vrf/custom_components/hisense_vrf <config>/custom_components/
+   cp -r hisense_vrf/pyacmodbus-stub/pyacmodbus  <config>/custom_components/hisense_vrf/
+   ```
 
-Since `pyacmodbus` isn't on PyPI yet, it has to be bundled into the custom component for HA OS installs:
+4. Restart Home Assistant (Settings → System → Restart).
 
-```bash
-# Copy the integration files
-cp -r homeassistant-v2/custom_components/hisense_vrf/* /Volumes/config/custom_components/hisense_vrf/
+5. Add the integration: **Settings → Devices & Services → Add Integration → Hisense VRF**. Provide the IP / hostname and TCP port (default `502`) of your i-Modkit gateway.
 
-# Bundle the library inside the integration directory
-cp -r homeassistant-v2/pyacmodbus-stub/pyacmodbus /Volumes/config/custom_components/hisense_vrf/
-```
+### Updating to a new release
 
-The integration's `__init__.py` uses `importlib.util.spec_from_file_location` to load the bundled `pyacmodbus` if it isn't pip-installed in the runtime. No `sys.path` manipulation is needed (this avoids shadowing stdlib modules like `select`).
+Repeat steps 3-4 above (the `cp -r` overwrites in place), then either:
 
-Restart HA after the first deploy. On subsequent updates, you can reload from **Settings → Devices & Services → Hisense VRF → ⋮ → Reload**. If the reload doesn't pick up code changes (Python cache), delete `__pycache__` under the integration dir before reloading.
+- **Reload** from **Settings → Devices & Services → Hisense VRF → ⋮ → Reload**, or
+- If the reload doesn't pick up the change, delete `<config>/custom_components/hisense_vrf/__pycache__/` and try again — Python caches the previous module.
+- For changes inside `pyacmodbus/`, the cache is stickier; do a full HA restart.
 
 ## Use cases
 
