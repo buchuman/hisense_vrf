@@ -5,7 +5,7 @@ __pycache__/
 *.so
 .Python
 
-# Build / dist artifacts
+# Build / dist artifacts (matches dist/ and build/ at any depth)
 build/
 dist/
 *.egg-info/

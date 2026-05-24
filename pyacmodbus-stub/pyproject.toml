@@ -4,7 +4,54 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyacmodbus"
-version = "0.2.0"
+version = "1.0.0"
 description = "Async Modbus TCP client for Hisense i-Modkit VRF gateways"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Bruno Acselrad", email = "buchuman@gmail.com"},
+]
+keywords = [
+    "home-assistant",
+    "hisense",
+    "vrf",
+    "modbus",
+    "modbus-tcp",
+    "hvac",
+    "i-modkit",
+    "imodkit",
+    "hcpc-h2m1c",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Home Automation",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Hardware",
+    "Typing :: Typed",
+]
 requires-python = ">=3.13"
-dependencies = ["pymodbus>=3.0.0"]
+dependencies = [
+    "pymodbus>=3.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/buchuman/hisense_vrf"
+Documentation = "https://github.com/buchuman/hisense_vrf/blob/main/REGISTERS.md"
+Repository = "https://github.com/buchuman/hisense_vrf"
+Issues = "https://github.com/buchuman/hisense_vrf/issues"
+Changelog = "https://github.com/buchuman/hisense_vrf/blob/main/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pyacmodbus*"]
+
+[tool.setuptools.package-data]
+pyacmodbus = ["py.typed"]
