@@ -1,7 +1,9 @@
 # Hisense VRF — Home Assistant Integration
 
+[![Tests](https://github.com/buchuman/hisense_vrf/actions/workflows/test.yml/badge.svg)](https://github.com/buchuman/hisense_vrf/actions/workflows/test.yml)
 [![quality-scale](https://img.shields.io/badge/quality__scale-platinum-9c27b0)](https://developers.home-assistant.io/docs/core/integration-quality-scale)
 [![version](https://img.shields.io/badge/version-1.0.0-blue)](custom_components/hisense_vrf/manifest.json)
+[![license: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Home Assistant custom integration to control Hisense VRF indoor units through an **i-Modkit Modbus TCP gateway** (model `HCPC-H2M1C`).
 
