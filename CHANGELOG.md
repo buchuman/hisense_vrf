@@ -4,6 +4,13 @@ All notable changes to the Hisense VRF integration are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] — 2026-05-25
+
+### Changed
+
+- `sensor.unit_system_number`, `sensor.unit_address_number`, `sensor.host_system_number`, and `sensor.host_address_number` now use `entity_category=DIAGNOSTIC`. They move from the device card's main Sensors section to the Diagnostic section, where identification metadata fits better. The values are unchanged.
+- `select.dry_mode` no longer sets `entity_category=CONFIG`. It now appears in the Controls section of the device card alongside the louver select, matching what users expect for a runtime control.
+
 ## [1.1.1] — 2026-05-24
 
 ### Added
@@ -60,6 +67,7 @@ First public release. Quality scale: **Platinum** (highest tier).
 - The `pyacmodbus` library is bundled inside `custom_components/hisense_vrf/` because it is not on PyPI yet. The integration loads it via `importlib.util.spec_from_file_location` without touching `sys.path` (avoids shadowing stdlib modules like `select`).
 - `EXP*` entities default to `disabled_by_default=True`. They're available but hidden until the user opts in from Settings → Devices → entity.
 
+[1.1.2]: https://github.com/buchuman/hisense_vrf/releases/tag/v1.1.2
 [1.1.1]: https://github.com/buchuman/hisense_vrf/releases/tag/v1.1.1
 [1.1.0]: https://github.com/buchuman/hisense_vrf/releases/tag/v1.1.0
 [1.0.0]: https://github.com/buchuman/hisense_vrf/releases/tag/v1.0.0

@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from homeassistant.components.select import SelectEntity
-from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -109,7 +108,6 @@ class DryModeSelect(HisenseVRFIndoorEntity, SelectEntity):
 
     _attr_translation_key = "dry_mode_select"
     _attr_options = list(DRY_MODES.keys())
-    _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(self, controller: HisenseVRFController, unit_index: int) -> None:
         super().__init__(controller, unit_index)
