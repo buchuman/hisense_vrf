@@ -19,7 +19,7 @@ from pyacmodbus import (
     MODE_HEAT,
 )
 
-from . import make_indoor_state
+from . import make_gateway_state, make_indoor_state
 
 
 def _fs_with_bit(reg_offset: int, bit: int, *, value: int = 1) -> tuple[int, ...]:
@@ -67,6 +67,7 @@ def scanned_climate(hass, mock_client):
     c.pending = {0: {}}
     c._off_pending = {0: {}}
     c.last_write_status = {0: {"status": "idle"}}
+    c.gateway_state = make_gateway_state()
     entity = HisenseVRFClimate(c, 0)
     entity.hass = hass
     return entity

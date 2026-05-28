@@ -26,9 +26,12 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from pyacmodbus import (
     ACDeviceState,
     ACModbusClient,
+    BASE_ADDR,
     GatewayState,
     ModbusReadError,
     OutdoorUnitState,
+    REG_RUN_STOP,
+    UNIT_STRIDE,
 )
 
 from .const import (
@@ -53,6 +56,21 @@ def _now_iso() -> str:
 
 def _swing_to_register(auto: bool, position: int) -> int:
     return (0x01 if auto else 0x00) | ((position & 0x07) << 1)
+
+
+_ON_DEBUG_FIELDS = (
+    "is_running", "op_state",
+    "current_mode", "mode_jump", "fan_speed", "fan_jump", "setpoint",
+    "prohibit_on_off", "prohibit_mode", "prohibit_fan",
+    "prohibit_swing", "prohibit_temp",
+    "alarm_code",
+)
+
+
+def _on_debug_snapshot(state: ACDeviceState | None) -> dict[str, Any]:
+    if state is None:
+        return {}
+    return {f: getattr(state, f, None) for f in _ON_DEBUG_FIELDS}
 
 
 class HisenseVRFController:
@@ -116,6 +134,15 @@ class HisenseVRFController:
         # Last unit_count value seen on the gateway; a delta triggers a
         # dynamic rescan to pick up newly connected/disconnected units.
         self._last_known_unit_count: int | None = None
+
+        # Tracks whether we already notified the user about the gate state so
+        # we don't spam notifications every poll cycle.
+        self._gate_notified: bool = False
+
+    @property
+    def gateway_controllable(self) -> bool:
+        """True iff the gateway reported ctrl_mode=1 in its last read."""
+        return self.gateway_state is not None and self.gateway_state.ctrl_mode == 1
 
     # ── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -255,7 +282,12 @@ class HisenseVRFController:
         _LOGGER.info("Polling stopped")
 
     async def _polling_loop(self) -> None:
-        """Read every unit on a fixed cadence; honour verify-window skips."""
+        """Read every unit on a fixed cadence; honour verify-window skips.
+
+        Each cycle starts with a gateway read. If ``ctrl_mode != 1`` (gate
+        state, e.g. EEPROM handshake in progress), the unit reads are skipped
+        and entities reflect that via ``gateway_controllable``.
+        """
         cycle = 0
         try:
             while True:
@@ -263,6 +295,18 @@ class HisenseVRFController:
                     await asyncio.sleep(self.poll_interval_s or 1.0)
                     continue
                 cycle += 1
+
+                await self._read_and_track_gateway()
+
+                if not self.gateway_controllable:
+                    if not self._gate_notified:
+                        self._notify_gate_state()
+                        self._gate_notified = True
+                    self._notify()
+                    if self.poll_interval_s > 0:
+                        await asyncio.sleep(self.poll_interval_s)
+                    continue
+
                 for idx in list(self.unit_indices):
                     if self.pending.get(idx):
                         _LOGGER.debug(
@@ -274,7 +318,6 @@ class HisenseVRFController:
                     if self.poll_spacing_s > 0:
                         await asyncio.sleep(self.poll_spacing_s)
                 if cycle % self.poll_gateway_every_n == 0:
-                    await self._read_and_track_gateway()
                     for sys_idx, mod_idx in self.outdoor_units:
                         try:
                             self.outdoor_states[(sys_idx, mod_idx)] = await self.client.read_outdoor_unit(
@@ -301,6 +344,17 @@ class HisenseVRFController:
 
     def _notify(self) -> None:
         async_dispatcher_send(self.hass, self.signal)
+
+    def _notify_gate_state(self) -> None:
+        """Persistent notification: the gateway is in handshake / not controllable."""
+        persistent_notification.async_create(
+            self.hass,
+            "The Modbus gateway is in handshake state (ctrl_mode=0). "
+            "Reads and writes are paused until it recovers (RUN light flashes again). "
+            "If this persists, check the gateway hardware.",
+            title="Hisense VRF — gateway not controllable",
+            notification_id=f"{DOMAIN}_{self.entry_id}_gate",
+        )
 
     # ── User resolution ──────────────────────────────────────────────────────
 
@@ -403,6 +457,28 @@ class HisenseVRFController:
         """
         user = await self._resolve_user(context)
         name = self.unit_name(unit_index)
+
+        if not self.gateway_controllable:
+            _LOGGER.warning(
+                "ON_BLOCKED unit=%s user=%s — gateway not controllable (ctrl_mode!=1)",
+                name, user,
+            )
+            persistent_notification.async_create(
+                self.hass,
+                f"Cannot power on {name}: the Modbus gateway is in handshake state "
+                "and not accepting commands. Wait until the RUN light flashes again, then retry.",
+                title=f"Hisense VRF — {name}",
+                notification_id=f"{DOMAIN}_{self.entry_id}_{unit_index}_gate",
+            )
+            self.last_write_status[unit_index] = {
+                "status": WRITE_STATUS_FAILED,
+                "error": "gateway not controllable (ctrl_mode!=1)",
+                "user": user,
+                "timestamp": _now_iso(),
+            }
+            self._notify()
+            return False
+
         state = self.indoor_states.get(unit_index)
         off_p = self._off_pending.get(unit_index, {})
 
@@ -457,6 +533,31 @@ class HisenseVRFController:
             name, user, mode, fan, swing_reg, temp_int,
         )
 
+        if _LOGGER.isEnabledFor(logging.DEBUG):
+            _LOGGER.debug(
+                "ON_PRE_WRITE_STATE unit=%s snapshot=%s",
+                name, _on_debug_snapshot(state),
+            )
+            try:
+                gw_state = await self.client.read_gateway()
+            except ModbusReadError as err:
+                _LOGGER.debug("ON_PRE_WRITE_GATEWAY unit=%s read failed: %s", name, err)
+            else:
+                _LOGGER.debug(
+                    "ON_PRE_WRITE_GATEWAY unit=%s gateway={alarm_display=%d unit_count=%d ctrl_mode=%d eeprom_clear=%d}",
+                    name,
+                    gw_state.alarm_display,
+                    gw_state.unit_count,
+                    gw_state.ctrl_mode,
+                    gw_state.eeprom_clear,
+                )
+            base_addr = BASE_ADDR + unit_index * UNIT_STRIDE + REG_RUN_STOP
+            payload = [1, mode, fan, swing_reg, temp_int]
+            _LOGGER.debug(
+                "ON_MODBUS_PAYLOAD unit=%s fc=0x10 base_addr=%d count=%d values=%s",
+                name, base_addr, len(payload), payload,
+            )
+
         # Flush the off_pending now; the verify cycle uses the regular pending overlay.
         self._off_pending.pop(unit_index, None)
         timer = self._off_timers.pop(unit_index, None)
@@ -484,6 +585,8 @@ class HisenseVRFController:
                 unit_index, 1, mode, fan, swing_reg, temp_int
             ),
             context=context,
+            verbose_on_debug=True,
+            retry_on_no_response=True,
         )
 
     # ── On-demand reads ──────────────────────────────────────────────────────
@@ -556,11 +659,22 @@ class HisenseVRFController:
                 self._gateway_read_failures,
             )
         self._gateway_read_failures = 0
+
+        was_controllable = self.gateway_controllable
         self.gateway_state = new_state
+        is_controllable = self.gateway_controllable
+        if was_controllable and not is_controllable:
+            _LOGGER.warning(
+                "Gateway ctrl_mode=%s — entering gate state, blocking unit reads/writes",
+                new_state.ctrl_mode,
+            )
+        elif not was_controllable and is_controllable:
+            _LOGGER.info("Gateway ctrl_mode=1 — gate state cleared, resuming normal polling")
+            self._gate_notified = False
 
         new_count = new_state.unit_count
         prior_count = self._last_known_unit_count
-        if prior_count is not None and new_count != prior_count:
+        if prior_count is not None and new_count != prior_count and is_controllable:
             _LOGGER.info(
                 "Gateway unit_count changed %s → %s, scanning for new devices",
                 prior_count, new_count,
@@ -679,15 +793,50 @@ class HisenseVRFController:
         write_fn: Callable[[], Awaitable[None]],
         *,
         context: Context | None = None,
+        verbose_on_debug: bool = False,
+        retry_on_no_response: bool = False,
     ) -> bool:
-        """Run the write-then-verify cycle for one indoor unit."""
+        """Run the write-then-verify cycle for one indoor unit.
+
+        ``verbose_on_debug`` enables extra _LOGGER.debug output (extended
+        snapshot per VERIFY and a diagnostic re-read after WRITE_FAILED).
+        ``retry_on_no_response`` re-sends the same write_fn one extra time
+        if the unit never reflected the change after the first round.
+        Both flags are used by the power-on path today.
+        """
         user = await self._resolve_user(context)
         name = self.unit_name(unit_index)
+        verbose = verbose_on_debug and _LOGGER.isEnabledFor(logging.DEBUG)
+        total_rounds = 2 if retry_on_no_response else 1
+        total_reads = self.verify_retries + 1
+
+        if not self.gateway_controllable:
+            _LOGGER.warning(
+                "WRITE_BLOCKED unit=%s user=%s — gateway not controllable (ctrl_mode!=1)",
+                name, user,
+            )
+            persistent_notification.async_create(
+                self.hass,
+                f"Cannot send command to {name}: the Modbus gateway is in handshake state "
+                "and not accepting commands. Wait until the RUN light flashes again, then retry.",
+                title=f"Hisense VRF — {name}",
+                notification_id=f"{DOMAIN}_{self.entry_id}_{unit_index}_gate",
+            )
+            self.last_write_status[unit_index] = {
+                "status": WRITE_STATUS_FAILED,
+                "fields": list(pending_attrs.keys()),
+                "expected": dict(pending_attrs),
+                "error": "gateway not controllable (ctrl_mode!=1)",
+                "user": user,
+                "timestamp": _now_iso(),
+            }
+            self._notify()
+            return False
 
         async with self._lock_for(unit_index):
             _LOGGER.info(
-                "WRITE unit=%s user=%s expected=%s delay=%.1fs retries=%d",
-                name, user, pending_attrs, self.verify_delay_s, self.verify_retries,
+                "WRITE unit=%s user=%s expected=%s delay=%.1fs retries=%d rounds=%d",
+                name, user, pending_attrs, self.verify_delay_s, self.verify_retries, total_rounds,
             )
 
             self.pending.setdefault(unit_index, {}).update(pending_attrs)
@@ -700,86 +849,127 @@ class HisenseVRFController:
             }
             self._notify()
 
-            try:
-                await write_fn()
-            except ModbusReadError as err:
-                _LOGGER.error("WRITE unit=%s user=%s send-failed: %s", name, user, err)
-                self._clear_pending(unit_index, pending_attrs)
-                self.last_write_status[unit_index] = {
-                    "status": WRITE_STATUS_FAILED,
-                    "fields": list(pending_attrs.keys()),
-                    "expected": dict(pending_attrs),
-                    "error": str(err),
-                    "user": user,
-                    "timestamp": _now_iso(),
-                }
-                self._on_write_failed(unit_index)
-                self._notify()
-                return False
-
-            _LOGGER.info("WRITE unit=%s user=%s sent, verifying...", name, user)
-
             last_state: ACDeviceState | None = None
-            total_reads = self.verify_retries + 1
-            for attempt in range(total_reads):
-                await asyncio.sleep(self.verify_delay_s)
-                try:
-                    state = await self.client.read_device(unit_index)
-                except ModbusReadError as err:
+            actual: dict[str, Any] = {}
+
+            for round_idx in range(total_rounds):
+                if round_idx > 0:
                     _LOGGER.warning(
-                        "VERIFY unit=%s attempt=%d/%d read-failed: %s",
-                        name, attempt + 1, total_reads, err,
+                        "ON_RETRY_AFTER_NO_RESPONSE unit=%s round=%d/%d — re-sending FC 0x10",
+                        name, round_idx + 1, total_rounds,
                     )
-                    continue
 
-                last_state = state
-                self.indoor_states[unit_index] = state
-
-                actual = {k: getattr(state, k, None) for k in pending_attrs}
-                match = verify_fn(state)
-                _LOGGER.info(
-                    "VERIFY unit=%s attempt=%d/%d read=%s match=%s",
-                    name, attempt + 1, total_reads, actual, match,
-                )
-
-                if match:
+                try:
+                    await write_fn()
+                except ModbusReadError as err:
+                    _LOGGER.error(
+                        "WRITE unit=%s user=%s round=%d/%d send-failed: %s",
+                        name, user, round_idx + 1, total_rounds, err,
+                    )
                     self._clear_pending(unit_index, pending_attrs)
                     self.last_write_status[unit_index] = {
-                        "status": WRITE_STATUS_CONFIRMED,
+                        "status": WRITE_STATUS_FAILED,
                         "fields": list(pending_attrs.keys()),
                         "expected": dict(pending_attrs),
-                        "actual": actual,
-                        "attempts": attempt + 1,
+                        "error": str(err),
                         "user": user,
                         "timestamp": _now_iso(),
                     }
-                    _LOGGER.info(
-                        "WRITE_CONFIRMED unit=%s user=%s attempts=%d expected=%s actual=%s",
-                        name, user, attempt + 1, pending_attrs, actual,
-                    )
-                    self._on_write_confirmed(unit_index)
+                    self._on_write_failed(unit_index)
                     self._notify()
-                    return True
+                    return False
 
+                _LOGGER.info(
+                    "WRITE unit=%s user=%s round=%d/%d sent, verifying...",
+                    name, user, round_idx + 1, total_rounds,
+                )
+                if verbose:
+                    _LOGGER.debug(
+                        "ON_WRITE_RETURNED unit=%s round=%d/%d (no exception, FC 0x10 accepted by gateway)",
+                        name, round_idx + 1, total_rounds,
+                    )
+
+                for attempt in range(total_reads):
+                    await asyncio.sleep(self.verify_delay_s)
+                    try:
+                        state = await self.client.read_device(unit_index)
+                    except ModbusReadError as err:
+                        _LOGGER.warning(
+                            "VERIFY unit=%s round=%d/%d attempt=%d/%d read-failed: %s",
+                            name, round_idx + 1, total_rounds, attempt + 1, total_reads, err,
+                        )
+                        continue
+
+                    last_state = state
+                    self.indoor_states[unit_index] = state
+
+                    actual = {k: getattr(state, k, None) for k in pending_attrs}
+                    match = verify_fn(state)
+                    _LOGGER.info(
+                        "VERIFY unit=%s round=%d/%d attempt=%d/%d read=%s match=%s",
+                        name, round_idx + 1, total_rounds, attempt + 1, total_reads, actual, match,
+                    )
+                    if verbose:
+                        _LOGGER.debug(
+                            "ON_VERIFY_EXTRA unit=%s round=%d/%d attempt=%d/%d snapshot=%s",
+                            name, round_idx + 1, total_rounds, attempt + 1, total_reads,
+                            _on_debug_snapshot(state),
+                        )
+
+                    if match:
+                        self._clear_pending(unit_index, pending_attrs)
+                        self.last_write_status[unit_index] = {
+                            "status": WRITE_STATUS_CONFIRMED,
+                            "fields": list(pending_attrs.keys()),
+                            "expected": dict(pending_attrs),
+                            "actual": actual,
+                            "attempts": attempt + 1,
+                            "round": round_idx + 1,
+                            "user": user,
+                            "timestamp": _now_iso(),
+                        }
+                        _LOGGER.info(
+                            "WRITE_CONFIRMED unit=%s user=%s round=%d/%d attempts=%d expected=%s actual=%s",
+                            name, user, round_idx + 1, total_rounds, attempt + 1, pending_attrs, actual,
+                        )
+                        self._on_write_confirmed(unit_index)
+                        self._notify()
+                        return True
+
+            # all rounds exhausted without match
             self._clear_pending(unit_index, pending_attrs)
-            actual = {}
+            final_actual: dict[str, Any] = {}
             if last_state is not None:
                 for k in pending_attrs:
                     if hasattr(last_state, k):
-                        actual[k] = getattr(last_state, k)
+                        final_actual[k] = getattr(last_state, k)
             self.last_write_status[unit_index] = {
                 "status": WRITE_STATUS_FAILED,
                 "fields": list(pending_attrs.keys()),
                 "expected": dict(pending_attrs),
-                "actual": actual,
+                "actual": final_actual,
                 "attempts": total_reads,
+                "rounds": total_rounds,
                 "user": user,
                 "timestamp": _now_iso(),
             }
             _LOGGER.warning(
-                "WRITE_FAILED unit=%s user=%s attempts=%d expected=%s actual=%s",
-                name, user, total_reads, pending_attrs, actual,
+                "WRITE_FAILED unit=%s user=%s rounds=%d attempts=%d expected=%s actual=%s",
+                name, user, total_rounds, total_reads, pending_attrs, final_actual,
             )
+            if verbose:
+                try:
+                    diag_state = await self.client.read_device(unit_index)
+                except ModbusReadError as err:
+                    _LOGGER.debug(
+                        "ON_FAILED_DIAG unit=%s re-read failed: %s", name, err,
+                    )
+                else:
+                    self.indoor_states[unit_index] = diag_state
+                    _LOGGER.debug(
+                        "ON_FAILED_DIAG unit=%s post-fail snapshot=%s",
+                        name, _on_debug_snapshot(diag_state),
+                    )
             self._on_write_failed(unit_index)
             self._notify()
             return False

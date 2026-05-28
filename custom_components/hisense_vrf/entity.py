@@ -54,6 +54,8 @@ class HisenseVRFIndoorEntity(HisenseVRFBaseEntity):
 
     @property
     def available(self) -> bool:
+        if not self.controller.gateway_controllable:
+            return False
         return self.unit_state is not None or self.controller.is_pending(self.unit_index)
 
     @property
@@ -113,6 +115,8 @@ class HisenseVRFOutdoorEntity(HisenseVRFBaseEntity):
 
     @property
     def available(self) -> bool:
+        if not self.controller.gateway_controllable:
+            return False
         return self.outdoor_state is not None
 
     @property
