@@ -261,7 +261,7 @@ class HisenseVRFController:
         if not self.polling_enabled:
             _LOGGER.info("Polling disabled by config; not starting loop")
             return
-        self._polling_task = self.hass.async_create_task(
+        self._polling_task = self.hass.async_create_background_task(
             self._polling_loop(), name=f"{DOMAIN}_polling_{self.entry_id}"
         )
         _LOGGER.info(

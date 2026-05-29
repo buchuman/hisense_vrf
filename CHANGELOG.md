@@ -4,6 +4,12 @@ All notable changes to the Hisense VRF integration are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] — 2026-05-28
+
+### Fixed
+
+- Polling task no longer blocks Home Assistant bootstrap completion. The `_polling_loop` is now scheduled with `hass.async_create_background_task` instead of `hass.async_create_task`, so the bootstrap stage doesn't wait ~5 minutes for the never-ending poll loop to "complete". Eliminates the `Setup timed out for bootstrap waiting on hisense_vrf_polling` warning and the corresponding "Something is blocking Home Assistant from wrapping up the start up phase" warning. No change to runtime behavior — the task still runs, is still cancelled cleanly on shutdown and reload.
+
 ## [1.2.0] — 2026-05-28
 
 ### Added
