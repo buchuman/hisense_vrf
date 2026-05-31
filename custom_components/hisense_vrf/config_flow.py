@@ -18,6 +18,7 @@ from homeassistant.const import CONF_HOST, CONF_PORT
 from pyacmodbus import ACModbusClient, CannotConnect
 
 from .const import (
+    CONF_CONNECT_TIMEOUT,
     CONF_OFF_PENDING_TTL,
     CONF_POLL_GATEWAY_EVERY_N,
     CONF_POLL_INTERVAL,
@@ -25,6 +26,7 @@ from .const import (
     CONF_POLLING_ENABLED,
     CONF_VERIFY_DELAY,
     CONF_VERIFY_RETRIES,
+    DEFAULT_CONNECT_TIMEOUT,
     DEFAULT_OFF_PENDING_TTL,
     DEFAULT_POLL_GATEWAY_EVERY_N,
     DEFAULT_POLL_INTERVAL,
@@ -34,12 +36,14 @@ from .const import (
     DEFAULT_VERIFY_DELAY,
     DEFAULT_VERIFY_RETRIES,
     DOMAIN,
+    MAX_CONNECT_TIMEOUT,
     MAX_OFF_PENDING_TTL,
     MAX_POLL_GATEWAY_EVERY_N,
     MAX_POLL_INTERVAL,
     MAX_POLL_SPACING,
     MAX_VERIFY_DELAY,
     MAX_VERIFY_RETRIES,
+    MIN_CONNECT_TIMEOUT,
     MIN_OFF_PENDING_TTL,
     MIN_POLL_GATEWAY_EVERY_N,
     MIN_POLL_INTERVAL,
@@ -96,6 +100,7 @@ class HisenseVRFConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_POLL_GATEWAY_EVERY_N: int(
                             user_input[CONF_POLL_GATEWAY_EVERY_N]
                         ),
+                        CONF_CONNECT_TIMEOUT: float(user_input[CONF_CONNECT_TIMEOUT]),
                     },
                 )
 
@@ -134,6 +139,12 @@ class HisenseVRFConfigFlow(ConfigFlow, domain=DOMAIN):
                 ): vol.All(
                     vol.Coerce(int),
                     vol.Range(min=MIN_POLL_GATEWAY_EVERY_N, max=MAX_POLL_GATEWAY_EVERY_N),
+                ),
+                vol.Required(
+                    CONF_CONNECT_TIMEOUT, default=DEFAULT_CONNECT_TIMEOUT
+                ): vol.All(
+                    vol.Coerce(float),
+                    vol.Range(min=MIN_CONNECT_TIMEOUT, max=MAX_CONNECT_TIMEOUT),
                 ),
             }
         )
@@ -210,6 +221,7 @@ class HisenseVRFOptionsFlow(OptionsFlowWithReload):
                     CONF_POLL_GATEWAY_EVERY_N: int(
                         user_input[CONF_POLL_GATEWAY_EVERY_N]
                     ),
+                    CONF_CONNECT_TIMEOUT: float(user_input[CONF_CONNECT_TIMEOUT]),
                 },
             )
 
@@ -254,6 +266,13 @@ class HisenseVRFOptionsFlow(OptionsFlowWithReload):
                 ): vol.All(
                     vol.Coerce(int),
                     vol.Range(min=MIN_POLL_GATEWAY_EVERY_N, max=MAX_POLL_GATEWAY_EVERY_N),
+                ),
+                vol.Required(
+                    CONF_CONNECT_TIMEOUT,
+                    default=current.get(CONF_CONNECT_TIMEOUT, DEFAULT_CONNECT_TIMEOUT),
+                ): vol.All(
+                    vol.Coerce(float),
+                    vol.Range(min=MIN_CONNECT_TIMEOUT, max=MAX_CONNECT_TIMEOUT),
                 ),
             }
         )

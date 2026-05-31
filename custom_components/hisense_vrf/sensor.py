@@ -28,6 +28,15 @@ from pyacmodbus import (
     BASE_ADDR,
     UNIT_STRIDE,
     ACDeviceState,
+    FAN_AUTO,
+    FAN_HIGH,
+    FAN_LOW,
+    FAN_MED,
+    MODE_AUTO,
+    MODE_COOL,
+    MODE_DRY,
+    MODE_FAN,
+    MODE_HEAT,
     OutdoorUnitState,
     fan_actual_name,
 )
@@ -215,6 +224,29 @@ INDOOR_SENSORS: tuple[IndoorSensorDescription, ...] = (
                              state_class=SensorStateClass.MEASUREMENT, value_fn=lambda d: d.mode_jump),
     IndoorSensorDescription(key="fan_jump", translation_key="fan_jump",
                              state_class=SensorStateClass.MEASUREMENT, value_fn=lambda d: d.fan_jump),
+    IndoorSensorDescription(
+        key="current_mode", translation_key="current_mode",
+        device_class=SensorDeviceClass.ENUM,
+        options=["auto", "cool", "dry", "fan_only", "heat"],
+        value_fn=lambda d: {
+            MODE_AUTO: "auto",
+            MODE_COOL: "cool",
+            MODE_DRY: "dry",
+            MODE_FAN: "fan_only",
+            MODE_HEAT: "heat",
+        }.get(d.current_mode),
+    ),
+    IndoorSensorDescription(
+        key="fan_speed", translation_key="fan_speed",
+        device_class=SensorDeviceClass.ENUM,
+        options=["auto", "high", "medium", "low"],
+        value_fn=lambda d: {
+            FAN_AUTO: "auto",
+            FAN_HIGH: "high",
+            FAN_MED: "medium",
+            FAN_LOW: "low",
+        }.get(d.fan_speed),
+    ),
     IndoorSensorDescription(key="func_display", translation_key="func_display", value_fn=lambda d: d.func_display),
     IndoorSensorDescription(
         key="dry_mode", translation_key="dry_mode",
@@ -297,6 +329,7 @@ def _build_indoor_sensors(
     ]
     entities.append(LastWriteStatusSensor(controller, idx))
     entities.append(RegisterBaseAddressSensor(controller, idx))
+    entities.append(CommandSlotSensor(controller, idx))
     for exp in ENUM_DESCRIPTORS:
         entities.append(ExpEnumSensor(controller, idx, exp))
     return entities
@@ -386,6 +419,49 @@ class RegisterBaseAddressSensor(HisenseVRFIndoorEntity, SensorEntity):
     @property
     def native_value(self) -> StateType:
         return BASE_ADDR + self.unit_index * UNIT_STRIDE
+
+
+class CommandSlotSensor(HisenseVRFIndoorEntity, SensorEntity):
+    """Raw value of registers 78..82 — the gateway's pending-command slot.
+
+    ``255,255,255,255,255`` means the slot is empty (the indoor unit consumed
+    the last command). Other values mean a command is pending or stuck (the
+    fingerprint of the intermittent on-failure bug).
+    """
+
+    _attr_translation_key = "command_slot"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, controller: HisenseVRFController, unit_index: int) -> None:
+        super().__init__(controller, unit_index)
+        self._attr_unique_id = (
+            f"{controller.entry_id}_indoor_{unit_index}_command_slot"
+        )
+
+    @property
+    def available(self) -> bool:
+        return self.controller.indoor_command_slots.get(self.unit_index) is not None
+
+    @property
+    def native_value(self) -> StateType:
+        slot = self.controller.indoor_command_slots.get(self.unit_index)
+        if slot is None:
+            return None
+        return ",".join(str(v) for v in slot)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        slot = self.controller.indoor_command_slots.get(self.unit_index)
+        if slot is None:
+            return {}
+        return {
+            "run_stop": slot[0],
+            "set_mode": slot[1],
+            "set_fan": slot[2],
+            "set_swing": slot[3],
+            "set_temp": slot[4],
+            "consumed": slot == [0xFF] * 5,
+        }
 
 
 class LastWriteStatusSensor(HisenseVRFIndoorEntity, SensorEntity):

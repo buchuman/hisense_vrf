@@ -4,6 +4,26 @@ All notable changes to the Hisense VRF integration are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] — 2026-05-31
+
+### Added
+
+- **Diagnostic buttons for the intermittent on-failure investigation.** One per indoor unit, all under `Diagnostic`:
+  - `Power on (run_stop only)` — writes only `REG_RUN_STOP=1` instead of the 5-register bundle, to isolate whether the bug is bundle-specific (FC 0x10 count=5) vs. single-register (count=1).
+  - `Reset F14 lock bits` — writes 0 to Function setting 14 (reg base+61), used to test whether wire-controller lock bits also block H-NET commands from the gateway.
+  - `Clear command slot 78-82` — writes `[0xFF]×5` to the gateway's pending command slot for the unit, clearing any stale pending command.
+- **Command slot 78-82 instrumentation.** The five registers act as the gateway's per-unit pending-command buffer — they are set to `[0xFF]×5` once the indoor unit consumes the command via H-NET. When they stay non-empty for more than a few seconds, the indoor unit failed to ACK (the wire-level fingerprint of the intermittent on-failure bug):
+  - `Command slot 78-82` sensor (Diagnostic) — CSV of the five values plus per-register attributes (`run_stop`, `set_mode`, `set_fan`, `set_swing`, `set_temp`) and a `consumed` boolean.
+  - `Command slot stuck` binary sensor (Problem class, visible) — fires when the slot ≠ `[0xFF]×5`.
+  - Controller-side cache (`indoor_command_slots`) refreshed on every poll, plus `ON_PRE_WRITE_SLOT` / `ON_VERIFY_SLOT` / `ON_FAILED_DIAG_SLOT` debug logging at every step of the power-on path.
+- **Remote-controller request sensors.** Expose what the user asked the wire/IR controller for, complementing the existing `mode_jump` / `fan_jump` (current execution) and `fan_actual` (physical):
+  - `Mode (remote request)` ENUM sensor — values `auto` / `cool` / `dry` / `fan_only` / `heat` (from `REG_CURR_MODE` bits 0-4).
+  - `Fan speed (remote request)` ENUM sensor — values `auto` / `high` / `medium` / `low` (from `REG_FAN_SW`).
+
+### Fixed
+
+- **Bootstrap hang when the gateway is unreachable.** The i-Modkit accepts only one TCP client at a time; if another client (another HA instance, a Modbus proxy/sniffer, a forgotten session) is holding it, `await client.connect()` could block `async_setup_entry` indefinitely instead of raising `CannotConnect`. The initial scan is now wrapped in `asyncio.timeout(connect_timeout_s)` (configurable in the options flow, default 5s, range 1-60s); on timeout `ConfigEntryNotReady` is raised so Home Assistant retries with backoff instead of stalling the bootstrap.
+
 ## [1.2.1] — 2026-05-28
 
 ### Fixed

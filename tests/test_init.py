@@ -45,6 +45,37 @@ async def test_setup_entry_initial_scan_failure_raises_not_ready(
     assert config_entry.state.value == "setup_retry"
 
 
+async def test_setup_entry_connect_timeout_raises_not_ready(
+    hass, mock_client, config_entry
+):
+    """If the initial scan exceeds connect_timeout_s, setup retries instead of
+    blocking the bootstrap forever (the bug previously seen when the gateway
+    was unreachable because another client held its single TCP slot).
+    """
+    import asyncio
+
+    from custom_components.hisense_vrf.const import CONF_CONNECT_TIMEOUT
+
+    config_entry.add_to_hass(hass)
+    hass.config_entries.async_update_entry(
+        config_entry,
+        options={**config_entry.options, CONF_CONNECT_TIMEOUT: 0.05},
+    )
+
+    async def _hang() -> None:
+        await asyncio.sleep(10)
+
+    mock_client.connect.side_effect = _hang
+
+    with patch(
+        "custom_components.hisense_vrf.ACModbusClient",
+        return_value=mock_client,
+    ):
+        result = await hass.config_entries.async_setup(config_entry.entry_id)
+    assert result is False
+    assert config_entry.state.value == "setup_retry"
+
+
 async def test_unload_entry_cleans_up(hass, setup_integration):
     entry = setup_integration
     assert await hass.config_entries.async_unload(entry.entry_id)

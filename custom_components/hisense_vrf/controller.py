@@ -110,6 +110,11 @@ class HisenseVRFController:
         self.gateway_state: GatewayState | None = None
         self.outdoor_states: dict[tuple[int, int], OutdoorUnitState | None] = {}
 
+        # Per-unit cache of registers 78..82 (gateway's pending command slot).
+        # [0xFF]*5 means the slot is empty (the unit consumed the last command);
+        # any other value means a command is pending. Refreshed on every poll.
+        self.indoor_command_slots: dict[int, list[int] | None] = {}
+
         # Pending overlay during the verify window of an in-flight write.
         self.pending: dict[int, dict[str, Any]] = {}
         # Accumulated changes while the unit is off; flushed on ON event or
@@ -557,6 +562,12 @@ class HisenseVRFController:
                 "ON_MODBUS_PAYLOAD unit=%s fc=0x10 base_addr=%d count=%d values=%s",
                 name, base_addr, len(payload), payload,
             )
+            slot_before = await self._read_command_slot(unit_index)
+            stale = slot_before is not None and slot_before != [0xFF] * 5
+            _LOGGER.debug(
+                "ON_PRE_WRITE_SLOT unit=%s slot=%s stale=%s",
+                name, slot_before, stale,
+            )
 
         # Flush the off_pending now; the verify cycle uses the regular pending overlay.
         self._off_pending.pop(unit_index, None)
@@ -587,6 +598,174 @@ class HisenseVRFController:
             context=context,
             verbose_on_debug=True,
             retry_on_no_response=True,
+        )
+
+    # ── Diagnostic: read/clear the gateway's pending command slot (regs 78-82) ─
+
+    async def _read_command_slot(self, unit_index: int) -> list[int] | None:
+        """Read regs 78..82 (the gateway's pending command slot for this unit).
+
+        When the gateway has forwarded the command to the indoor unit via H-NET
+        and the indoor unit acknowledged it, the gateway resets these registers
+        to ``[0xFF]*5``. If they show other values, the gateway is still holding
+        a pending command — typically the symptom of the intermittent on-failure
+        where the indoor unit never confirmed reception.
+        """
+        base = BASE_ADDR + unit_index * UNIT_STRIDE + REG_RUN_STOP
+        try:
+            async with self.client._lock:  # noqa: SLF001
+                client = self.client._require_client()  # noqa: SLF001
+                result = await client.read_holding_registers(
+                    base, count=5, device_id=self.client._slave_id  # noqa: SLF001
+                )
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("command slot read failed for unit %d: %s", unit_index, err)
+            return None
+        if (
+            result.isError()
+            or not getattr(result, "registers", None)
+            or len(result.registers) < 5
+        ):
+            return None
+        return list(result.registers)
+
+    async def async_clear_command_slot(
+        self,
+        unit_index: int,
+        *,
+        context: Context | None = None,
+    ) -> bool:
+        """Write ``[0xFF]*5`` to regs 78..82 — clear any stale pending command.
+
+        Diagnostic: if a previous bundled write got stuck (gateway holds the
+        command pending forever because the indoor unit never ACKed via H-NET),
+        explicitly resetting the slot to the sentinel may allow the next write
+        to land on a clean slot.
+        """
+        user = await self._resolve_user(context)
+        name = self.unit_name(unit_index)
+
+        if not self.gateway_controllable:
+            _LOGGER.warning(
+                "CLEAR_SLOT_BLOCKED unit=%s user=%s — gateway not controllable",
+                name, user,
+            )
+            return False
+
+        before = await self._read_command_slot(unit_index)
+        _LOGGER.warning(
+            "CLEAR_SLOT unit=%s user=%s — slot_before=%s, writing [0xFF]*5",
+            name, user, before,
+        )
+        try:
+            await self.client.write_control_block(
+                unit_index, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
+            )
+        except ModbusReadError as err:
+            _LOGGER.error("CLEAR_SLOT unit=%s failed: %s", name, err)
+            return False
+        after = await self._read_command_slot(unit_index)
+        _LOGGER.warning(
+            "CLEAR_SLOT_DONE unit=%s slot_after=%s",
+            name, after,
+        )
+        self._notify()
+        return True
+
+    # ── Diagnostic: reset Function setting 14 (wire controller lock) ─────────
+
+    async def async_reset_function_14(
+        self,
+        unit_index: int,
+        *,
+        context: Context | None = None,
+    ) -> None:
+        """Write 0 to Function setting 14 (reg base+61) — clears all wire
+        controller lock bits (F8/F9/FA/FB/FF). Used to test the hypothesis
+        that those lock bits also block H-NET commands from the gateway.
+        """
+        user = await self._resolve_user(context)
+        name = self.unit_name(unit_index)
+
+        if not self.gateway_controllable:
+            _LOGGER.warning(
+                "RESET_F14_BLOCKED unit=%s user=%s — gateway not controllable", name, user,
+            )
+            return
+
+        offset = 61  # Function setting 14
+        addr = BASE_ADDR + unit_index * UNIT_STRIDE + offset
+        _LOGGER.warning(
+            "RESET_F14 unit=%s user=%s — writing 0 to reg %d (Function setting 14)",
+            name, user, addr,
+        )
+        # _write_unit is the low-level API in the pyacmodbus client. Used here
+        # for a one-off diagnostic experiment; no public client method exists
+        # for arbitrary function-setting writes today.
+        await self.client._write_unit(unit_index, offset, 0)  # noqa: SLF001
+        # Read back to confirm
+        try:
+            state = await self.client.read_device(unit_index)
+            self.indoor_states[unit_index] = state
+            _LOGGER.warning(
+                "RESET_F14_DONE unit=%s — read back confirmed (state updated)",
+                name,
+            )
+        except ModbusReadError as err:
+            _LOGGER.warning("RESET_F14_READBACK_FAILED unit=%s: %s", name, err)
+        self._notify()
+
+    # ── Diagnostic: power on writing only REG_RUN_STOP=1 ─────────────────────
+
+    async def async_power_on_runstop_only(
+        self,
+        unit_index: int,
+        *,
+        context: Context | None = None,
+    ) -> bool:
+        """Power on the unit by writing ONLY REG_RUN_STOP=1, no bundled write.
+
+        Used to diagnose whether the intermittent on-failure is specific to
+        the 5-register bundle (FC 0x10 with count=5) vs. a single-register
+        write (FC 0x10 with count=1). Mode/fan/setpoint are not touched —
+        the unit keeps whatever was already configured.
+        """
+        user = await self._resolve_user(context)
+        name = self.unit_name(unit_index)
+
+        if not self.gateway_controllable:
+            _LOGGER.warning(
+                "RUNSTOP_ONLY_BLOCKED unit=%s user=%s — gateway not controllable",
+                name, user,
+            )
+            persistent_notification.async_create(
+                self.hass,
+                f"Cannot power on {name} (run_stop only): the Modbus gateway is in handshake state.",
+                title=f"Hisense VRF — {name}",
+                notification_id=f"{DOMAIN}_{self.entry_id}_{unit_index}_gate",
+            )
+            return False
+
+        _LOGGER.info("RUNSTOP_ONLY unit=%s user=%s — writing only REG_RUN_STOP=1", name, user)
+        if _LOGGER.isEnabledFor(logging.DEBUG):
+            _LOGGER.debug(
+                "RUNSTOP_ONLY_PRE_STATE unit=%s snapshot=%s",
+                name, _on_debug_snapshot(self.indoor_states.get(unit_index)),
+            )
+            base_addr = BASE_ADDR + unit_index * UNIT_STRIDE + REG_RUN_STOP
+            _LOGGER.debug(
+                "RUNSTOP_ONLY_PAYLOAD unit=%s fc=0x10 base_addr=%d count=1 value=1",
+                name, base_addr,
+            )
+
+        return await self.async_write_and_verify(
+            unit_index,
+            pending_attrs={"is_running": True},
+            verify_fn=lambda s: s.is_running,
+            write_fn=lambda: self.client.turn_on(unit_index),
+            context=context,
+            verbose_on_debug=True,
+            retry_on_no_response=False,
         )
 
     # ── On-demand reads ──────────────────────────────────────────────────────
@@ -756,6 +935,7 @@ class HisenseVRFController:
                     name, failures,
                 )
                 self.indoor_states[unit_index] = None
+                self.indoor_command_slots[unit_index] = None
                 self._notify()
             return None
 
@@ -768,6 +948,8 @@ class HisenseVRFController:
             )
         self._unit_read_failures[unit_index] = 0
         self.indoor_states[unit_index] = state
+        # Refresh the command slot cache (regs 78..82).
+        self.indoor_command_slots[unit_index] = await self._read_command_slot(unit_index)
         if (
             self._off_pending.get(unit_index)
             and state.is_running
@@ -915,6 +1097,13 @@ class HisenseVRFController:
                             name, round_idx + 1, total_rounds, attempt + 1, total_reads,
                             _on_debug_snapshot(state),
                         )
+                        slot_now = await self._read_command_slot(unit_index)
+                        slot_consumed = slot_now == [0xFF] * 5
+                        _LOGGER.debug(
+                            "ON_VERIFY_SLOT unit=%s round=%d/%d attempt=%d/%d slot=%s consumed=%s",
+                            name, round_idx + 1, total_rounds, attempt + 1, total_reads,
+                            slot_now, slot_consumed,
+                        )
 
                     if match:
                         self._clear_pending(unit_index, pending_attrs)
@@ -970,6 +1159,11 @@ class HisenseVRFController:
                         "ON_FAILED_DIAG unit=%s post-fail snapshot=%s",
                         name, _on_debug_snapshot(diag_state),
                     )
+                slot_post = await self._read_command_slot(unit_index)
+                _LOGGER.debug(
+                    "ON_FAILED_DIAG_SLOT unit=%s slot=%s stuck=%s",
+                    name, slot_post, slot_post is not None and slot_post != [0xFF] * 5,
+                )
             self._on_write_failed(unit_index)
             self._notify()
             return False

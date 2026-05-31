@@ -29,6 +29,9 @@ def _build_indoor_buttons(
         ResetFilterButton(controller, idx),
         LockAllButton(controller, idx),
         UnlockAllButton(controller, idx),
+        PowerOnRunStopOnlyButton(controller, idx),
+        ResetFunction14Button(controller, idx),
+        ClearCommandSlotButton(controller, idx),
     ]
 
 
@@ -188,3 +191,51 @@ class UnlockAllButton(HisenseVRFIndoorEntity, ButtonEntity):
     async def async_press(self) -> None:
         await self.controller.client.unlock_all(self.unit_index)
         await self.controller.async_refresh_unit(self.unit_index, context=self._context)
+
+
+class ClearCommandSlotButton(HisenseVRFIndoorEntity, ButtonEntity):
+    """Diagnostic: write [0xFF]*5 to regs 78..82 — clear stale pending command."""
+
+    _attr_translation_key = "clear_command_slot"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, controller: HisenseVRFController, unit_index: int) -> None:
+        super().__init__(controller, unit_index)
+        self._attr_unique_id = f"{controller.entry_id}_indoor_{unit_index}_clear_command_slot"
+
+    async def async_press(self) -> None:
+        await self.controller.async_clear_command_slot(
+            self.unit_index, context=self._context
+        )
+
+
+class ResetFunction14Button(HisenseVRFIndoorEntity, ButtonEntity):
+    """Diagnostic: write 0 to Function setting 14 (clears wire controller lock bits)."""
+
+    _attr_translation_key = "reset_function_14"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, controller: HisenseVRFController, unit_index: int) -> None:
+        super().__init__(controller, unit_index)
+        self._attr_unique_id = f"{controller.entry_id}_indoor_{unit_index}_reset_function_14"
+
+    async def async_press(self) -> None:
+        await self.controller.async_reset_function_14(
+            self.unit_index, context=self._context
+        )
+
+
+class PowerOnRunStopOnlyButton(HisenseVRFIndoorEntity, ButtonEntity):
+    """Diagnostic: power on by writing only REG_RUN_STOP=1 (no bundled write)."""
+
+    _attr_translation_key = "power_on_runstop_only"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, controller: HisenseVRFController, unit_index: int) -> None:
+        super().__init__(controller, unit_index)
+        self._attr_unique_id = f"{controller.entry_id}_indoor_{unit_index}_power_on_runstop_only"
+
+    async def async_press(self) -> None:
+        await self.controller.async_power_on_runstop_only(
+            self.unit_index, context=self._context
+        )

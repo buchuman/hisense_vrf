@@ -19,7 +19,8 @@
           "polling_enabled": "Enable polling",
           "poll_interval_s": "Polling interval (seconds between cycles)",
           "poll_spacing_s": "Polling spacing (seconds between unit reads)",
-          "poll_gateway_every_n_cycles": "Poll gateway/outdoor every N cycles"
+          "poll_gateway_every_n_cycles": "Poll gateway/outdoor every N cycles",
+          "connect_timeout_s": "Connect timeout (seconds)"
         },
         "data_description": {
           "host": "IP address or hostname of the i-Modkit gateway.",
@@ -30,7 +31,8 @@
           "polling_enabled": "When enabled, the integration reads each unit on a fixed cadence so the UI reflects external changes.",
           "poll_interval_s": "Pause between polling cycles. 0 means cycles run back-to-back.",
           "poll_spacing_s": "Pause between consecutive unit reads inside a cycle. Leave at 0 unless you need to throttle.",
-          "poll_gateway_every_n_cycles": "Read the gateway state and outdoor unit only every N cycles (these change slowly)."
+          "poll_gateway_every_n_cycles": "Read the gateway state and outdoor unit only every N cycles (these change slowly).",
+          "connect_timeout_s": "Max seconds to wait for the initial connection and scan at startup. If exceeded, Home Assistant will retry with backoff instead of blocking the bootstrap."
         }
       },
       "reconfigure": {
@@ -66,7 +68,8 @@
           "polling_enabled": "Enable polling",
           "poll_interval_s": "Polling interval (seconds between cycles)",
           "poll_spacing_s": "Polling spacing (seconds between unit reads)",
-          "poll_gateway_every_n_cycles": "Poll gateway/outdoor every N cycles"
+          "poll_gateway_every_n_cycles": "Poll gateway/outdoor every N cycles",
+          "connect_timeout_s": "Connect timeout (seconds)"
         },
         "data_description": {
           "verify_delay_s": "Seconds between a write and the verification read.",
@@ -75,7 +78,8 @@
           "polling_enabled": "Toggle background polling without uninstalling the integration.",
           "poll_interval_s": "Pause between polling cycles. 0 means cycles run back-to-back.",
           "poll_spacing_s": "Pause between consecutive unit reads inside a cycle.",
-          "poll_gateway_every_n_cycles": "Read gateway and outdoor units only every N cycles."
+          "poll_gateway_every_n_cycles": "Read gateway and outdoor units only every N cycles.",
+          "connect_timeout_s": "Max seconds to wait for the initial connection and scan at startup. If exceeded, Home Assistant retries with backoff instead of blocking the bootstrap."
         }
       }
     }
@@ -186,6 +190,25 @@
       "fan_jump": {
         "name": "Fan jump"
       },
+      "current_mode": {
+        "name": "Mode (remote request)",
+        "state": {
+          "auto": "Auto",
+          "cool": "Cool",
+          "dry": "Dry",
+          "fan_only": "Fan only",
+          "heat": "Heat"
+        }
+      },
+      "fan_speed": {
+        "name": "Fan speed (remote request)",
+        "state": {
+          "auto": "Auto",
+          "high": "High",
+          "medium": "Medium",
+          "low": "Low"
+        }
+      },
       "func_display": {
         "name": "Function display"
       },
@@ -199,6 +222,9 @@
       },
       "register_base_address": {
         "name": "Register base address"
+      },
+      "command_slot": {
+        "name": "Command slot 78-82"
       },
       "last_write_status": {
         "name": "Last write status",
@@ -349,6 +375,9 @@
       },
       "remote_control_active": {
         "name": "Remote control active"
+      },
+      "command_slot_stuck": {
+        "name": "Command slot stuck"
       },
       "gw_ctrl_mode": {
         "name": "Modbus control mode"
@@ -719,6 +748,15 @@
       },
       "unlock_all": {
         "name": "Unlock all controls"
+      },
+      "power_on_runstop_only": {
+        "name": "Power on (run_stop only — diagnostic)"
+      },
+      "reset_function_14": {
+        "name": "Reset F14 lock bits (diagnostic)"
+      },
+      "clear_command_slot": {
+        "name": "Clear command slot 78-82 (diagnostic)"
       },
       "eeprom_clear": {
         "name": "Clear EEPROM"

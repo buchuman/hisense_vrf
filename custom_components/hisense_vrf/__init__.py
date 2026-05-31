@@ -1,6 +1,7 @@
 """Hisense VRF — Home Assistant integration for i-Modkit Modbus TCP gateways."""
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from homeassistant.config_entries import ConfigEntry
@@ -11,6 +12,7 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from pyacmodbus import ACModbusClient, CannotConnect, ModbusReadError
 
 from .const import (
+    CONF_CONNECT_TIMEOUT,
     CONF_OFF_PENDING_TTL,
     CONF_POLL_GATEWAY_EVERY_N,
     CONF_POLL_INTERVAL,
@@ -18,6 +20,7 @@ from .const import (
     CONF_POLLING_ENABLED,
     CONF_VERIFY_DELAY,
     CONF_VERIFY_RETRIES,
+    DEFAULT_CONNECT_TIMEOUT,
     DEFAULT_OFF_PENDING_TTL,
     DEFAULT_POLL_GATEWAY_EVERY_N,
     DEFAULT_POLL_INTERVAL,
@@ -44,6 +47,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: HisenseVRFConfigEntry) -
     poll_interval = float(entry.options.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL))
     poll_spacing = float(entry.options.get(CONF_POLL_SPACING, DEFAULT_POLL_SPACING))
     poll_gw_every = int(entry.options.get(CONF_POLL_GATEWAY_EVERY_N, DEFAULT_POLL_GATEWAY_EVERY_N))
+    connect_timeout = float(entry.options.get(CONF_CONNECT_TIMEOUT, DEFAULT_CONNECT_TIMEOUT))
 
     client = ACModbusClient(host=host, port=port)
     controller = HisenseVRFController(
@@ -60,7 +64,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: HisenseVRFConfigEntry) -
     )
 
     try:
-        await controller.async_initial_scan()
+        async with asyncio.timeout(connect_timeout):
+            await controller.async_initial_scan()
+    except TimeoutError as err:
+        raise ConfigEntryNotReady(
+            f"Initial scan timed out after {connect_timeout}s on {host}:{port}"
+        ) from err
     except CannotConnect as err:
         raise ConfigEntryNotReady(f"Cannot connect to {host}:{port}") from err
     except ModbusReadError as err:
