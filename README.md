@@ -201,6 +201,8 @@ When you add the integration the form asks for these values; all of them are edi
 | Polling interval (s)         | 5       | 0–3600         | Pause between polling cycles. 0 means cycles run back-to-back.         |
 | Polling spacing (s)          | 0       | 0–10           | Pause between consecutive unit reads inside one cycle.                 |
 | Poll gateway every N cycles  | 10      | 1–1000         | The gateway and outdoor module are slower-moving data; default is read every 10 polling cycles (~50 s with the default interval). |
+| Connect timeout (s)          | 5.0     | 1–60           | Max wait for the initial connection/scan at startup before raising `ConfigEntryNotReady` (so HA retries with backoff instead of hanging the bootstrap). |
+| Force 0→1 edge on power-on retry | true | —             | When a power-on isn't reflected on the first try, the retry writes `run_stop=0` first to force a fresh `0→1` transition before re-sending the ON command. Works around units an IR remote turned off, leaving the gateway's run state out of sync. See Troubleshooting. |
 
 ## Usage
 
@@ -224,6 +226,11 @@ The gateway is a separate device named **Hisense VRF Gateway** with: `Refresh al
 
 - Check the `Last write status` diagnostic sensor — the registers may be accepting the value but the unit itself ignores it because of a function-selection capability (e.g. `B5 Fixing of operating mode` blocks mode changes).
 - Look at the EXP diagnostic entities for that unit; the relevant `Fixing of *` bit being ON is the most common cause.
+
+### An indoor unit intermittently won't turn on from HA (but the IR/wire remote works)
+
+- This is the gateway's intermittent on-failure: the power-on bundle is accepted by the gateway but the indoor unit never reflects `is_running=True`, and the `Command slot stuck` binary sensor for that unit goes ON (registers 78-82 hold a non-`[0xFF]` command the unit never consumed). Resending the same ON after several minutes works.
+- Working theory: units controlled by an **IR remote** (not an on-bus wire controller) get turned off directly at the unit, so the gateway's commanded run baseline stays at `1`; a fresh `run_stop=1` is then not a `0→1` edge and is ignored until the gateway's slow poll re-syncs. The `Force 0→1 edge on power-on retry` option (default on) works around this by writing `run_stop=0` before the retry. Watch the log for `ON_EDGE_FORCE` followed by `WRITE_CONFIRMED round=2/2` (edge worked) vs `WRITE_FAILED` (it didn't).
 
 ### `HVACMode.HEAT_COOL` (Auto) doesn't appear in the climate selector
 

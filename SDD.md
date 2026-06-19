@@ -189,7 +189,7 @@ Stub library bundled with the integration (not on PyPI). It encapsulates:
 
 ### 3.4 `config_flow.py`
 
-- **User step:** host + port + parameters (`verify_delay_s`, `verify_retries`, `off_pending_ttl_s`, `polling_enabled`, `poll_interval_s`, `poll_spacing_s`, `poll_gateway_every_n_cycles`).
+- **User step:** host + port + parameters (`verify_delay_s`, `verify_retries`, `off_pending_ttl_s`, `polling_enabled`, `poll_interval_s`, `poll_spacing_s`, `poll_gateway_every_n_cycles`, `connect_timeout_s`, `on_edge_force`).
 - **Reconfigure step:** lets the user change host/port without recreating the entry (Gold rule).
 - **Options flow:** runtime tweak of parameters (without host/port — those go through reconfigure).
 - **Unique ID:** `{host}:{port}` (Bronze rule).
@@ -283,6 +283,8 @@ async_send_on_with_pending(idx, mode_override?)
 ```
 
 `write_control_block` issues a single Modbus 0x10 frame with the 5 control registers (40078-40082). This is what the i-Modkit manual recommends to power on a unit with a target configuration: one atomic operation instead of 5 individual writes.
+
+The ON path runs `async_write_and_verify` with `retry_on_no_response=True` (two rounds) and a `pre_retry_fn` (the edge-force, when `on_edge_force` is enabled — default). If round 1 isn't confirmed, round 2 first writes `REG_RUN_STOP=0`, waits `ON_EDGE_SETTLE_S` (1.0 s), then re-sends the bundle, forcing a real `0→1` edge instead of an identical resend. This works around the intermittent on-failure where an IR remote turned the unit off off-bus, leaving the gateway's run baseline stuck at `1` so a fresh `1` is a no-op until its slow poll re-syncs. Logged at WARNING (`ON_EDGE_FORCE` / `ON_EDGE_FORCE_OFF_SENT` / `ON_EDGE_FORCE_SETTLED`); a subsequent `WRITE_CONFIRMED round=2/2` means the forced edge powered the unit. See the v1.4.0 CHANGELOG entry.
 
 ### 4.5 Dynamic devices
 

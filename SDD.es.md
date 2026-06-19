@@ -189,7 +189,7 @@ Stub library bundled con el integration (no está en PyPI). Encapsula:
 
 ### 3.4 `config_flow.py`
 
-- **User step:** host + port + parámetros (`verify_delay_s`, `verify_retries`, `off_pending_ttl_s`, `polling_enabled`, `poll_interval_s`, `poll_spacing_s`, `poll_gateway_every_n_cycles`).
+- **User step:** host + port + parámetros (`verify_delay_s`, `verify_retries`, `off_pending_ttl_s`, `polling_enabled`, `poll_interval_s`, `poll_spacing_s`, `poll_gateway_every_n_cycles`, `connect_timeout_s`, `on_edge_force`).
 - **Reconfigure step:** permite cambiar host/port sin recrear el entry (Gold rule).
 - **Options flow:** ajuste runtime de los parámetros (sin host/port, eso requiere reconfigure).
 - **Unique ID:** `{host}:{port}` (Bronze rule).
@@ -283,6 +283,8 @@ async_send_on_with_pending(idx, mode_override?)
 ```
 
 El `write_control_block` envía un único frame Modbus 0x10 con los 5 control registers (40078-40082). Esto es lo que el manual del i-Modkit recomienda para encender una unit con configuración: una operación atómica en vez de 5 writes individuales.
+
+El ON-path corre `async_write_and_verify` con `retry_on_no_response=True` (dos rounds) y un `pre_retry_fn` (el edge-force, cuando `on_edge_force` está habilitado — default). Si el round 1 no confirma, el round 2 primero escribe `REG_RUN_STOP=0`, espera `ON_EDGE_SETTLE_S` (1.0 s) y recién ahí reenvía el bundle, forzando un flanco `0→1` real en vez de un resend idéntico. Esto rodea el fallo intermitente de encendido en el que un control IR apagó la unit por fuera del bus, dejando el baseline de run del gateway trabado en `1`, de modo que un `1` nuevo es no-op hasta que el poll lento del gateway resincroniza. Logueado a WARNING (`ON_EDGE_FORCE` / `ON_EDGE_FORCE_OFF_SENT` / `ON_EDGE_FORCE_SETTLED`); un `WRITE_CONFIRMED round=2/2` posterior significa que el flanco forzado encendió la unit. Ver la entrada v1.4.0 del CHANGELOG.
 
 ### 4.5 Dynamic devices
 

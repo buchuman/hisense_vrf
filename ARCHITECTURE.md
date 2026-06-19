@@ -105,6 +105,14 @@ The `pending` overlay (a dict of `{field: expected_value}` per unit) is applied 
 
 Both `verify_delay_s` (default 2 s) and `verify_retries` (default 3) are exposed in the options flow. Slow units may need a longer delay; fast LAN setups can drop the delay to 0.5 s.
 
+### Power-on edge-force (intermittent on-failure workaround)
+
+The power-on path (`async_send_on_with_pending`) runs `async_write_and_verify` with `retry_on_no_response=True` (two rounds) and a `pre_retry_fn`. Round 1 sends the ON bundle as usual; if it isn't confirmed, round 2 — instead of resending an identical `run_stop=1` — first writes `run_stop=0`, waits `ON_EDGE_SETTLE_S` (1.0 s) for it to propagate, then re-sends the bundle, forcing a genuine `0→1` edge.
+
+**Why**: units controlled by an IR remote are turned off directly at the unit, off the H-NET bus, so the gateway's commanded run baseline stays at `1`. A fresh `run_stop=1` is then not an edge and the gateway never relays it via H-NET — the unit stays off until the gateway's own slow poll re-syncs the baseline (the "wait several minutes then resend" symptom users hit). Writing `run_stop=0` ourselves resyncs the baseline immediately so the next `1` is a real edge. Units with an on-bus wire controller never exhibit this (their state changes are seen by H-NET tracking), and units that power on cleanly on round 1 are untouched.
+
+Gated by the `on_edge_force` option (default on; kill-switch in the config/options flow). Logged at WARNING for analysis without DEBUG: `ON_EDGE_FORCE` / `ON_EDGE_FORCE_OFF_SENT` / `ON_EDGE_FORCE_SETTLED`; a following `WRITE_CONFIRMED round=2/2` means the forced edge powered the unit, a `WRITE_FAILED` means it did not (which would point to intermittent H-NET delivery rather than a baseline desync).
+
 ---
 
 ## 4. Off-pending TTL & bundled ON event
