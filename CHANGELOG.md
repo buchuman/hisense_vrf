@@ -4,6 +4,14 @@ All notable changes to the Hisense VRF integration are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] — 2026-06-19
+
+### Fixed
+
+- **Edge-force now waits for the OFF to be *consumed* before re-sending the ON.** The v1.4.0 edge-force slept a fixed `1.0s` after writing `REG_RUN_STOP=0`, then immediately re-sent the ON bundle. In prod (unit `ac_indoor_unit_0013`, 2026-06-19) that 1s was too short: the gateway had not yet drained the OFF from its per-unit command slot (`ON_EDGE_FORCE_SETTLED … consumed=False`), so the re-sent ON overwrote the slot before the OFF ever reached the H-NET bus — the edge was lost and the unit stayed off (`WRITE_FAILED`). The edge-force now **polls the command slot until it drains back to `[0xFF]*5`** (the gateway consumed the OFF), up to `ON_EDGE_DRAIN_TIMEOUT_S` (8s), before re-sending the ON. Only then is the ON a genuine `0→1` transition on the bus.
+  - New WARNING markers: `ON_EDGE_FORCE_SETTLED … consumed=True waited=…s polls=…` (OFF drained, ON re-sent as an edge) vs `ON_EDGE_FORCE_NOT_DRAINED` (gateway never consumed the OFF within the timeout; ON re-sent anyway — edge may still be lost, escalate).
+  - New tunables `ON_EDGE_DRAIN_TIMEOUT_S` and `ON_EDGE_POLL_INTERVAL_S`.
+
 ## [1.4.0] — 2026-06-19
 
 ### Added

@@ -36,6 +36,8 @@ from pyacmodbus import (
 
 from .const import (
     DOMAIN,
+    ON_EDGE_DRAIN_TIMEOUT_S,
+    ON_EDGE_POLL_INTERVAL_S,
     ON_EDGE_SETTLE_S,
     UNAVAILABLE_THRESHOLD,
     WRITE_FAILED_ISSUE_THRESHOLD,
@@ -628,16 +630,25 @@ class HisenseVRFController:
         stays off until the gateway's slow poll re-syncs its baseline (the
         "several minutes" before a manual resend works).
 
-        This writes REG_RUN_STOP=0 (resyncing the baseline to off), waits for
-        it to propagate, then returns; the caller re-sends the ON bundle, which
-        is now an unambiguous 0->1 transition. Logged at WARNING so the
-        on-failure path is analysable from the Logs panel without DEBUG.
+        This writes REG_RUN_STOP=0 (resyncing the baseline to off), then *waits
+        for the gateway to actually consume that OFF* — the command slot must
+        drain back to ``[0xFF]*5`` — before returning; the caller then re-sends
+        the ON bundle, which is now an unambiguous 0->1 transition on the bus.
+
+        Why the wait must be a drain-poll, not a fixed sleep (v1.5.0): the
+        gateway drains its per-unit command buffer on its own slow H-NET cycle.
+        If we re-send the ON before the OFF drains, the ON simply overwrites the
+        buffer slot and the gateway never transmits the OFF — so there is no real
+        edge on the bus and the unit stays off. This was observed in prod on
+        2026-06-19 (unit ac_indoor_unit_0013): a fixed 1.0s settle left the slot
+        ``consumed=False`` and the resend produced WRITE_FAILED. Logged at
+        WARNING so the on-failure path is analysable from the Logs panel.
         """
         slot_before = await self._read_command_slot(unit_index)
         _LOGGER.warning(
             "ON_EDGE_FORCE unit=%s user=%s — writing REG_RUN_STOP=0 to force a "
-            "0->1 edge; slot_before=%s settle=%.1fs",
-            name, user, slot_before, ON_EDGE_SETTLE_S,
+            "0->1 edge; slot_before=%s settle=%.1fs drain_timeout=%.1fs",
+            name, user, slot_before, ON_EDGE_SETTLE_S, ON_EDGE_DRAIN_TIMEOUT_S,
         )
         try:
             await self.client.turn_off(unit_index)
@@ -649,14 +660,34 @@ class HisenseVRFController:
             )
             return
         _LOGGER.warning("ON_EDGE_FORCE_OFF_SENT unit=%s user=%s", name, user)
+
+        # Wait for the gateway to consume the OFF (slot -> [0xFF]*5) so it is
+        # actually transmitted onto the H-NET bus before we re-send the ON.
         await asyncio.sleep(ON_EDGE_SETTLE_S)
+        waited = ON_EDGE_SETTLE_S
         slot_after = await self._read_command_slot(unit_index)
         consumed = slot_after == [0xFF] * 5
-        _LOGGER.warning(
-            "ON_EDGE_FORCE_SETTLED unit=%s user=%s slot_after=%s consumed=%s "
-            "— re-sending ON bundle now as a 0->1 edge",
-            name, user, slot_after, consumed,
-        )
+        polls = 0
+        while not consumed and waited < ON_EDGE_DRAIN_TIMEOUT_S:
+            await asyncio.sleep(ON_EDGE_POLL_INTERVAL_S)
+            waited += ON_EDGE_POLL_INTERVAL_S
+            polls += 1
+            slot_after = await self._read_command_slot(unit_index)
+            consumed = slot_after == [0xFF] * 5
+
+        if consumed:
+            _LOGGER.warning(
+                "ON_EDGE_FORCE_SETTLED unit=%s user=%s slot_after=%s consumed=True "
+                "waited=%.1fs polls=%d — OFF drained, re-sending ON as a 0->1 edge",
+                name, user, slot_after, waited, polls,
+            )
+        else:
+            _LOGGER.warning(
+                "ON_EDGE_FORCE_NOT_DRAINED unit=%s user=%s slot_after=%s "
+                "waited=%.1fs polls=%d — gateway did not consume the OFF within "
+                "the timeout; re-sending ON anyway (edge may still be lost)",
+                name, user, slot_after, waited, polls,
+            )
 
     # ── Diagnostic: read/clear the gateway's pending command slot (regs 78-82) ─
 

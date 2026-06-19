@@ -26,11 +26,21 @@ DEFAULT_ON_EDGE_FORCE = True
 
 # When a power-on bundle is not reflected by the unit on the first round, the
 # retry round writes REG_RUN_STOP=0 first (forcing a 0->1 edge that the IR
-# remote otherwise steals from the gateway's command tracking), waits this many
-# seconds for the 0 to propagate, then re-sends the ON bundle. See the
-# on-failure investigation: the gateway only relays a run/stop change as an
-# edge, so re-sending an identical "1" is a no-op until its slow poll re-syncs.
-ON_EDGE_SETTLE_S = 1.0
+# remote otherwise steals from the gateway's command tracking), then re-sends the
+# ON bundle. See the on-failure investigation: the gateway only relays a run/stop
+# change as an edge, so re-sending an identical "1" is a no-op until its slow
+# poll re-syncs.
+#
+# CRITICAL (v1.5.0): the OFF must be *consumed* by the gateway (command slot
+# drains back to [0xFF]*5) before the ON is re-sent. The gateway drains its
+# per-unit command buffer on its own slow H-NET cycle; if the ON overwrites the
+# buffer before the OFF drains, the gateway never transmits the OFF and the edge
+# is lost (observed 2026-06-19: slot_after consumed=False after a fixed 1.0s
+# sleep -> WRITE_FAILED). So we poll the slot until the OFF drains, up to a
+# timeout, instead of sleeping a fixed amount.
+ON_EDGE_SETTLE_S = 1.0  # minimum settle before the first drain poll
+ON_EDGE_DRAIN_TIMEOUT_S = 8.0  # max wait for the gateway to consume the OFF
+ON_EDGE_POLL_INTERVAL_S = 0.5  # interval between drain polls
 
 MIN_VERIFY_DELAY = 0.2
 MAX_VERIFY_DELAY = 30.0

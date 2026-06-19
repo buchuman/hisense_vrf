@@ -427,6 +427,9 @@ async def test_power_on_retry_forces_edge_when_enabled(
     monkeypatch.setattr(
         "custom_components.hisense_vrf.controller.ON_EDGE_SETTLE_S", 0.0
     )
+    monkeypatch.setattr(
+        "custom_components.hisense_vrf.controller.ON_EDGE_DRAIN_TIMEOUT_S", 0.0
+    )
     scanned_climate.controller.indoor_states[0] = make_indoor_state(
         is_running=False, current_mode=MODE_HEAT, fan_speed=FAN_HIGH,
         setpoint=24.0, auto_swing=False, louver_position=0,
@@ -449,6 +452,9 @@ async def test_power_on_retry_no_edge_when_disabled(
     monkeypatch.setattr(
         "custom_components.hisense_vrf.controller.ON_EDGE_SETTLE_S", 0.0
     )
+    monkeypatch.setattr(
+        "custom_components.hisense_vrf.controller.ON_EDGE_DRAIN_TIMEOUT_S", 0.0
+    )
     scanned_climate.controller.on_edge_force = False
     scanned_climate.controller.indoor_states[0] = make_indoor_state(
         is_running=False, current_mode=MODE_HEAT, fan_speed=FAN_HIGH,
@@ -461,3 +467,39 @@ async def test_power_on_retry_no_edge_when_disabled(
     assert ok is False
     assert mock_client.write_control_block.await_count == 2
     mock_client.turn_off.assert_not_awaited()
+
+
+async def test_edge_force_waits_for_off_to_drain(
+    scanned_climate, mock_client, monkeypatch
+):
+    """The edge-force polls the command slot until the OFF is consumed before
+    the caller re-sends the ON, instead of sleeping a fixed amount. The OFF is
+    'pending' for two polls, then the gateway drains it to [0xFF]*5."""
+    monkeypatch.setattr(
+        "custom_components.hisense_vrf.controller.ON_EDGE_SETTLE_S", 0.0
+    )
+    monkeypatch.setattr(
+        "custom_components.hisense_vrf.controller.ON_EDGE_POLL_INTERVAL_S", 0.0
+    )
+    monkeypatch.setattr(
+        "custom_components.hisense_vrf.controller.ON_EDGE_DRAIN_TIMEOUT_S", 5.0
+    )
+
+    # Slot reads: pending, pending, then consumed ([0xFF]*5).
+    slot_reads = [[0, 16, 2, 0, 28], [0, 16, 2, 0, 28], [0xFF] * 5]
+    calls = []
+
+    async def fake_read_slot(unit_index):
+        calls.append(unit_index)
+        return slot_reads.pop(0) if slot_reads else [0xFF] * 5
+
+    monkeypatch.setattr(
+        scanned_climate.controller, "_read_command_slot", fake_read_slot
+    )
+
+    await scanned_climate.controller._on_edge_force_prewrite(0, "main_suite", "test")
+
+    # OFF was sent, then the slot was polled until it drained to [0xFF]*5
+    # (slot_before + at least two drain polls = 3+ reads).
+    mock_client.turn_off.assert_awaited_once()
+    assert len(calls) >= 3
