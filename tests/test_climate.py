@@ -407,3 +407,57 @@ async def test_turn_off_when_off_no_op(scanned_climate, mock_client):
     scanned_climate.controller.indoor_states[0] = make_indoor_state(is_running=False)
     await scanned_climate.async_turn_off()
     mock_client.turn_off.assert_not_awaited()
+
+
+# ── Power-on edge-force (intermittent on-failure workaround) ─────────────────
+
+
+def _stuck_off(idx):
+    """read_device stub: the unit never reflects is_running=True."""
+    return make_indoor_state(
+        unit_index=idx, is_running=False, current_mode=MODE_HEAT,
+        fan_speed=FAN_HIGH, setpoint=24.0, auto_swing=False, louver_position=0,
+    )
+
+
+async def test_power_on_retry_forces_edge_when_enabled(
+    scanned_climate, mock_client, monkeypatch
+):
+    """On a failed first round, the retry writes run_stop=0 before re-sending."""
+    monkeypatch.setattr(
+        "custom_components.hisense_vrf.controller.ON_EDGE_SETTLE_S", 0.0
+    )
+    scanned_climate.controller.indoor_states[0] = make_indoor_state(
+        is_running=False, current_mode=MODE_HEAT, fan_speed=FAN_HIGH,
+        setpoint=24.0, auto_swing=False, louver_position=0,
+    )
+    mock_client.read_device.side_effect = _stuck_off
+
+    ok = await scanned_climate.controller.async_send_on_with_pending(0)
+
+    assert ok is False
+    # Two rounds of the ON bundle...
+    assert mock_client.write_control_block.await_count == 2
+    # ...with exactly one run_stop=0 edge-force before the retry round.
+    mock_client.turn_off.assert_awaited_once()
+
+
+async def test_power_on_retry_no_edge_when_disabled(
+    scanned_climate, mock_client, monkeypatch
+):
+    """With edge-force off, the retry is a plain resend — no run_stop=0."""
+    monkeypatch.setattr(
+        "custom_components.hisense_vrf.controller.ON_EDGE_SETTLE_S", 0.0
+    )
+    scanned_climate.controller.on_edge_force = False
+    scanned_climate.controller.indoor_states[0] = make_indoor_state(
+        is_running=False, current_mode=MODE_HEAT, fan_speed=FAN_HIGH,
+        setpoint=24.0, auto_swing=False, louver_position=0,
+    )
+    mock_client.read_device.side_effect = _stuck_off
+
+    ok = await scanned_climate.controller.async_send_on_with_pending(0)
+
+    assert ok is False
+    assert mock_client.write_control_block.await_count == 2
+    mock_client.turn_off.assert_not_awaited()

@@ -36,6 +36,7 @@ from pyacmodbus import (
 
 from .const import (
     DOMAIN,
+    ON_EDGE_SETTLE_S,
     UNAVAILABLE_THRESHOLD,
     WRITE_FAILED_ISSUE_THRESHOLD,
     WRITE_STATUS_CONFIRMED,
@@ -88,6 +89,7 @@ class HisenseVRFController:
         poll_interval_s: float,
         poll_spacing_s: float,
         poll_gateway_every_n: int,
+        on_edge_force: bool = True,
     ) -> None:
         self.hass = hass
         self.entry_id = entry_id
@@ -99,6 +101,12 @@ class HisenseVRFController:
         self.poll_interval_s = poll_interval_s
         self.poll_spacing_s = poll_spacing_s
         self.poll_gateway_every_n = max(1, poll_gateway_every_n)
+        # When True, the power-on retry round forces a 0->1 edge (write
+        # REG_RUN_STOP=0, settle, then re-send the ON bundle) instead of a
+        # plain identical resend. Targets the intermittent on-failure where an
+        # IR-driven OFF desyncs the gateway's run baseline. Kill-switch only;
+        # has no effect on units that power on cleanly on the first round.
+        self.on_edge_force = on_edge_force
         self._polling_task: asyncio.Task | None = None
 
         self.unit_indices: list[int] = []
@@ -584,6 +592,13 @@ class HisenseVRFController:
             "setpoint": float(temp_int),
         }
 
+        pre_retry_fn: Callable[[], Awaitable[None]] | None = None
+        if self.on_edge_force:
+            async def _edge_force() -> None:
+                await self._on_edge_force_prewrite(unit_index, name, user)
+
+            pre_retry_fn = _edge_force
+
         return await self.async_write_and_verify(
             unit_index,
             pending_attrs=pending_attrs,
@@ -598,6 +613,49 @@ class HisenseVRFController:
             context=context,
             verbose_on_debug=True,
             retry_on_no_response=True,
+            pre_retry_fn=pre_retry_fn,
+        )
+
+    async def _on_edge_force_prewrite(
+        self, unit_index: int, name: str, user: str
+    ) -> None:
+        """Force a 0->1 edge before the power-on retry re-sends the ON bundle.
+
+        The intermittent on-failure looks like this: an IR remote turned the
+        unit off directly (bypassing the bus), so the gateway still believes
+        the commanded run state is 1. Re-sending run_stop=1 is therefore not a
+        fresh 0->1 edge and the gateway never relays it via H-NET — the unit
+        stays off until the gateway's slow poll re-syncs its baseline (the
+        "several minutes" before a manual resend works).
+
+        This writes REG_RUN_STOP=0 (resyncing the baseline to off), waits for
+        it to propagate, then returns; the caller re-sends the ON bundle, which
+        is now an unambiguous 0->1 transition. Logged at WARNING so the
+        on-failure path is analysable from the Logs panel without DEBUG.
+        """
+        slot_before = await self._read_command_slot(unit_index)
+        _LOGGER.warning(
+            "ON_EDGE_FORCE unit=%s user=%s — writing REG_RUN_STOP=0 to force a "
+            "0->1 edge; slot_before=%s settle=%.1fs",
+            name, user, slot_before, ON_EDGE_SETTLE_S,
+        )
+        try:
+            await self.client.turn_off(unit_index)
+        except ModbusReadError as err:
+            _LOGGER.warning(
+                "ON_EDGE_FORCE_OFF_FAILED unit=%s user=%s — turn_off raised: %s "
+                "(falling back to a plain resend)",
+                name, user, err,
+            )
+            return
+        _LOGGER.warning("ON_EDGE_FORCE_OFF_SENT unit=%s user=%s", name, user)
+        await asyncio.sleep(ON_EDGE_SETTLE_S)
+        slot_after = await self._read_command_slot(unit_index)
+        consumed = slot_after == [0xFF] * 5
+        _LOGGER.warning(
+            "ON_EDGE_FORCE_SETTLED unit=%s user=%s slot_after=%s consumed=%s "
+            "— re-sending ON bundle now as a 0->1 edge",
+            name, user, slot_after, consumed,
         )
 
     # ── Diagnostic: read/clear the gateway's pending command slot (regs 78-82) ─
@@ -977,6 +1035,7 @@ class HisenseVRFController:
         context: Context | None = None,
         verbose_on_debug: bool = False,
         retry_on_no_response: bool = False,
+        pre_retry_fn: Callable[[], Awaitable[None]] | None = None,
     ) -> bool:
         """Run the write-then-verify cycle for one indoor unit.
 
@@ -984,7 +1043,9 @@ class HisenseVRFController:
         snapshot per VERIFY and a diagnostic re-read after WRITE_FAILED).
         ``retry_on_no_response`` re-sends the same write_fn one extra time
         if the unit never reflected the change after the first round.
-        Both flags are used by the power-on path today.
+        ``pre_retry_fn``, when set, is awaited before each retry round's
+        write_fn — the power-on path uses it to force a 0->1 edge.
+        All three are used by the power-on path today.
         """
         user = await self._resolve_user(context)
         name = self.unit_name(unit_index)
@@ -1040,6 +1101,8 @@ class HisenseVRFController:
                         "ON_RETRY_AFTER_NO_RESPONSE unit=%s round=%d/%d — re-sending FC 0x10",
                         name, round_idx + 1, total_rounds,
                     )
+                    if pre_retry_fn is not None:
+                        await pre_retry_fn()
 
                 try:
                     await write_fn()

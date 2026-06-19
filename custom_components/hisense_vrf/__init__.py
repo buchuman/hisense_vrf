@@ -14,6 +14,7 @@ from pyacmodbus import ACModbusClient, CannotConnect, ModbusReadError
 from .const import (
     CONF_CONNECT_TIMEOUT,
     CONF_OFF_PENDING_TTL,
+    CONF_ON_EDGE_FORCE,
     CONF_POLL_GATEWAY_EVERY_N,
     CONF_POLL_INTERVAL,
     CONF_POLL_SPACING,
@@ -22,6 +23,7 @@ from .const import (
     CONF_VERIFY_RETRIES,
     DEFAULT_CONNECT_TIMEOUT,
     DEFAULT_OFF_PENDING_TTL,
+    DEFAULT_ON_EDGE_FORCE,
     DEFAULT_POLL_GATEWAY_EVERY_N,
     DEFAULT_POLL_INTERVAL,
     DEFAULT_POLL_SPACING,
@@ -48,6 +50,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: HisenseVRFConfigEntry) -
     poll_spacing = float(entry.options.get(CONF_POLL_SPACING, DEFAULT_POLL_SPACING))
     poll_gw_every = int(entry.options.get(CONF_POLL_GATEWAY_EVERY_N, DEFAULT_POLL_GATEWAY_EVERY_N))
     connect_timeout = float(entry.options.get(CONF_CONNECT_TIMEOUT, DEFAULT_CONNECT_TIMEOUT))
+    on_edge_force = bool(entry.options.get(CONF_ON_EDGE_FORCE, DEFAULT_ON_EDGE_FORCE))
 
     client = ACModbusClient(host=host, port=port)
     controller = HisenseVRFController(
@@ -61,6 +64,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: HisenseVRFConfigEntry) -
         poll_interval_s=poll_interval,
         poll_spacing_s=poll_spacing,
         poll_gateway_every_n=poll_gw_every,
+        on_edge_force=on_edge_force,
     )
 
     try:

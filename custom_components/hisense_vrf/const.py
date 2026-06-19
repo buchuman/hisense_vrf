@@ -11,6 +11,7 @@ CONF_POLL_SPACING = "poll_spacing_s"
 CONF_POLL_GATEWAY_EVERY_N = "poll_gateway_every_n_cycles"
 CONF_POLLING_ENABLED = "polling_enabled"
 CONF_CONNECT_TIMEOUT = "connect_timeout_s"
+CONF_ON_EDGE_FORCE = "on_edge_force"
 
 DEFAULT_PORT = 502
 DEFAULT_VERIFY_DELAY = 2.0
@@ -21,6 +22,15 @@ DEFAULT_POLL_SPACING = 0.0
 DEFAULT_POLL_GATEWAY_EVERY_N = 10
 DEFAULT_POLLING_ENABLED = True
 DEFAULT_CONNECT_TIMEOUT = 5.0
+DEFAULT_ON_EDGE_FORCE = True
+
+# When a power-on bundle is not reflected by the unit on the first round, the
+# retry round writes REG_RUN_STOP=0 first (forcing a 0->1 edge that the IR
+# remote otherwise steals from the gateway's command tracking), waits this many
+# seconds for the 0 to propagate, then re-sends the ON bundle. See the
+# on-failure investigation: the gateway only relays a run/stop change as an
+# edge, so re-sending an identical "1" is a no-op until its slow poll re-syncs.
+ON_EDGE_SETTLE_S = 1.0
 
 MIN_VERIFY_DELAY = 0.2
 MAX_VERIFY_DELAY = 30.0

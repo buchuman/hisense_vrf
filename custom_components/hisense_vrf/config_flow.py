@@ -20,6 +20,7 @@ from pyacmodbus import ACModbusClient, CannotConnect
 from .const import (
     CONF_CONNECT_TIMEOUT,
     CONF_OFF_PENDING_TTL,
+    CONF_ON_EDGE_FORCE,
     CONF_POLL_GATEWAY_EVERY_N,
     CONF_POLL_INTERVAL,
     CONF_POLL_SPACING,
@@ -28,6 +29,7 @@ from .const import (
     CONF_VERIFY_RETRIES,
     DEFAULT_CONNECT_TIMEOUT,
     DEFAULT_OFF_PENDING_TTL,
+    DEFAULT_ON_EDGE_FORCE,
     DEFAULT_POLL_GATEWAY_EVERY_N,
     DEFAULT_POLL_INTERVAL,
     DEFAULT_POLL_SPACING,
@@ -101,6 +103,7 @@ class HisenseVRFConfigFlow(ConfigFlow, domain=DOMAIN):
                             user_input[CONF_POLL_GATEWAY_EVERY_N]
                         ),
                         CONF_CONNECT_TIMEOUT: float(user_input[CONF_CONNECT_TIMEOUT]),
+                        CONF_ON_EDGE_FORCE: bool(user_input[CONF_ON_EDGE_FORCE]),
                     },
                 )
 
@@ -146,6 +149,9 @@ class HisenseVRFConfigFlow(ConfigFlow, domain=DOMAIN):
                     vol.Coerce(float),
                     vol.Range(min=MIN_CONNECT_TIMEOUT, max=MAX_CONNECT_TIMEOUT),
                 ),
+                vol.Required(
+                    CONF_ON_EDGE_FORCE, default=DEFAULT_ON_EDGE_FORCE
+                ): bool,
             }
         )
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
@@ -222,6 +228,7 @@ class HisenseVRFOptionsFlow(OptionsFlowWithReload):
                         user_input[CONF_POLL_GATEWAY_EVERY_N]
                     ),
                     CONF_CONNECT_TIMEOUT: float(user_input[CONF_CONNECT_TIMEOUT]),
+                    CONF_ON_EDGE_FORCE: bool(user_input[CONF_ON_EDGE_FORCE]),
                 },
             )
 
@@ -274,6 +281,10 @@ class HisenseVRFOptionsFlow(OptionsFlowWithReload):
                     vol.Coerce(float),
                     vol.Range(min=MIN_CONNECT_TIMEOUT, max=MAX_CONNECT_TIMEOUT),
                 ),
+                vol.Required(
+                    CONF_ON_EDGE_FORCE,
+                    default=current.get(CONF_ON_EDGE_FORCE, DEFAULT_ON_EDGE_FORCE),
+                ): bool,
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)

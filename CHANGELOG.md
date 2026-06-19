@@ -4,6 +4,14 @@ All notable changes to the Hisense VRF integration are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] — 2026-06-19
+
+### Added
+
+- **Edge-forced power-on retry (intermittent on-failure workaround).** When a power-on bundle is accepted by the gateway but the unit never reflects `is_running=True` on the first round, the retry round now writes `REG_RUN_STOP=0` first, waits ~1s for it to propagate, then re-sends the ON bundle — turning a useless identical resend into a real `0→1` edge. This targets the failure mode where an IR remote turned the unit off directly (bypassing the H-NET bus), leaving the gateway's run baseline stuck at `1` so a fresh `1` is a no-op until the gateway's slow poll re-syncs (the "wait several minutes and retry" symptom). Units that power on cleanly on the first round are unaffected.
+  - New `on_edge_force` option (default on, toggle in the config/options flow) as a kill-switch.
+  - Logged at WARNING for post-hoc analysis from the Logs panel without enabling DEBUG: `ON_EDGE_FORCE` (slot before + settle), `ON_EDGE_FORCE_OFF_SENT`, `ON_EDGE_FORCE_SETTLED` (slot after + `consumed`). A subsequent `WRITE_CONFIRMED round=2/2` means the forced edge powered the unit; a `WRITE_FAILED` means it did not.
+
 ## [1.3.0] — 2026-05-31
 
 ### Added
