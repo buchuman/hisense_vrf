@@ -21,7 +21,8 @@
           "poll_spacing_s": "Polling spacing (seconds between unit reads)",
           "poll_gateway_every_n_cycles": "Poll gateway/outdoor every N cycles",
           "connect_timeout_s": "Connect timeout (seconds)",
-          "on_edge_force": "Force 0→1 edge on power-on retry"
+          "on_edge_force": "Force 0→1 edge on power-on retry",
+          "on_retry": "Keep retrying power-on in the background"
         },
         "data_description": {
           "host": "IP address or hostname of the i-Modkit gateway.",
@@ -34,7 +35,8 @@
           "poll_spacing_s": "Pause between consecutive unit reads inside a cycle. Leave at 0 unless you need to throttle.",
           "poll_gateway_every_n_cycles": "Read the gateway state and outdoor unit only every N cycles (these change slowly).",
           "connect_timeout_s": "Max seconds to wait for the initial connection and scan at startup. If exceeded, Home Assistant will retry with backoff instead of blocking the bootstrap.",
-          "on_edge_force": "When a power-on is not reflected on the first try, the retry writes run_stop=0 first to force a fresh 0→1 transition before re-sending the ON command. Works around units that an IR remote turned off, leaving the gateway's run state out of sync. Leave on unless it causes trouble."
+          "on_edge_force": "When a power-on is not reflected on the first try, the retry writes run_stop=0 first to force a fresh 0→1 transition before re-sending the ON command. Works around units that an IR remote turned off, leaving the gateway's run state out of sync. Off by default — prod evidence showed it doesn't help; the background retry below does.",
+          "on_retry": "Only the power-on command intermittently fails (off/temp/mode never do). When a power-on isn't confirmed, a background task keeps re-sending it for a few minutes until the unit turns on — or stops early if the unit turns on by any means, its state changes externally, or you send another command. Recommended on."
         }
       },
       "reconfigure": {
@@ -72,7 +74,8 @@
           "poll_spacing_s": "Polling spacing (seconds between unit reads)",
           "poll_gateway_every_n_cycles": "Poll gateway/outdoor every N cycles",
           "connect_timeout_s": "Connect timeout (seconds)",
-          "on_edge_force": "Force 0→1 edge on power-on retry"
+          "on_edge_force": "Force 0→1 edge on power-on retry",
+          "on_retry": "Keep retrying power-on in the background"
         },
         "data_description": {
           "verify_delay_s": "Seconds between a write and the verification read.",
@@ -83,7 +86,8 @@
           "poll_spacing_s": "Pause between consecutive unit reads inside a cycle.",
           "poll_gateway_every_n_cycles": "Read gateway and outdoor units only every N cycles.",
           "connect_timeout_s": "Max seconds to wait for the initial connection and scan at startup. If exceeded, Home Assistant retries with backoff instead of blocking the bootstrap.",
-          "on_edge_force": "When a power-on is not reflected on the first try, the retry writes run_stop=0 first to force a fresh 0→1 transition before re-sending the ON command. Works around units an IR remote turned off, leaving the gateway's run state out of sync."
+          "on_edge_force": "When a power-on is not reflected on the first try, the retry writes run_stop=0 first to force a fresh 0→1 transition before re-sending the ON command. Off by default — prod evidence showed it doesn't help; the background retry below does.",
+          "on_retry": "Only the power-on command intermittently fails. When one isn't confirmed, a background task keeps re-sending it for a few minutes until the unit turns on, stopping early on success by any path, an external state change, or a new command. Recommended on."
         }
       }
     }
@@ -236,6 +240,7 @@
           "idle": "Idle",
           "pending": "Pending",
           "off_pending": "Pending (unit off)",
+          "retrying": "Retrying power-on…",
           "confirmed": "Confirmed",
           "failed": "Failed"
         }

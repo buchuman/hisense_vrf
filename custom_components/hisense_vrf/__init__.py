@@ -15,6 +15,7 @@ from .const import (
     CONF_CONNECT_TIMEOUT,
     CONF_OFF_PENDING_TTL,
     CONF_ON_EDGE_FORCE,
+    CONF_ON_RETRY,
     CONF_POLL_GATEWAY_EVERY_N,
     CONF_POLL_INTERVAL,
     CONF_POLL_SPACING,
@@ -24,6 +25,7 @@ from .const import (
     DEFAULT_CONNECT_TIMEOUT,
     DEFAULT_OFF_PENDING_TTL,
     DEFAULT_ON_EDGE_FORCE,
+    DEFAULT_ON_RETRY,
     DEFAULT_POLL_GATEWAY_EVERY_N,
     DEFAULT_POLL_INTERVAL,
     DEFAULT_POLL_SPACING,
@@ -51,6 +53,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: HisenseVRFConfigEntry) -
     poll_gw_every = int(entry.options.get(CONF_POLL_GATEWAY_EVERY_N, DEFAULT_POLL_GATEWAY_EVERY_N))
     connect_timeout = float(entry.options.get(CONF_CONNECT_TIMEOUT, DEFAULT_CONNECT_TIMEOUT))
     on_edge_force = bool(entry.options.get(CONF_ON_EDGE_FORCE, DEFAULT_ON_EDGE_FORCE))
+    on_retry = bool(entry.options.get(CONF_ON_RETRY, DEFAULT_ON_RETRY))
 
     client = ACModbusClient(host=host, port=port)
     controller = HisenseVRFController(
@@ -65,6 +68,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: HisenseVRFConfigEntry) -
         poll_spacing_s=poll_spacing,
         poll_gateway_every_n=poll_gw_every,
         on_edge_force=on_edge_force,
+        on_retry=on_retry,
     )
 
     try:

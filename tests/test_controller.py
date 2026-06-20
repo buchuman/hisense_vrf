@@ -43,6 +43,9 @@ async def controller(hass, mock_client):
         poll_spacing_s=0.0,
         poll_gateway_every_n=2,
     )
+    # Default the on-failure workarounds off; tests opt in explicitly.
+    c.on_edge_force = False
+    c.on_retry = False
     yield c
     # Teardown: cancel any leftover timers/tasks so HA's lingering-resource
     # check doesn't fail unrelated tests.

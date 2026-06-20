@@ -4,6 +4,20 @@ All notable changes to the Hisense VRF integration are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] — 2026-06-20
+
+### Added
+
+- **Long-window background power-on resend — the real fix for the intermittent on-failure.** Diagnosis (see CHANGELOG 1.4.0/1.5.0 and prod capture 2026-06-19): only the **ON** command ever fails (OFF/temp/mode/fan never do), because ON is the only command issued against a unit the gateway is desynced from / whose H-NET path is dormant after an off-bus IR power-off. During the stall the gateway does not deliver the command for minutes; recovery only comes from resending a fresh ON until the path wakes (the user's "resend after several minutes works"). So when the synchronous ON attempt fails, a per-unit background task now keeps resending the ON bundle every ~25 s (±5 s jitter) for up to 6 minutes, watching actual state every ~5 s.
+  - **Stops as soon as the goal is met or the situation changes**: the unit reports running by *any* path (our resend, the IR remote, another user) → confirmed; an externally-originated state change while still off → yields control (idle); a new HA command for the unit supersedes it; an OFF cancels it; the gateway dropping to handshake aborts it; otherwise it gives up at the timeout (failed).
+  - **Scoped to the ON path only** — OFF/temp/mode/fan are untouched. Per-unit locking means every other unit stays fully controllable; the newest command always wins (it cancels any in-flight retry first); the retry recomposes the bundle each round so a setpoint/mode/fan change made while it runs is picked up.
+  - **UI**: new `retrying` state on the `Last write status` sensor (with `attempt` / `remaining_s` attributes); the climate card stays optimistically ON for the whole window. New `on_retry` option (default on) as a kill-switch.
+  - **Logged at WARNING**: `ON_RETRY_START`, `ON_RETRY_RESEND`, `ON_RETRY_SUCCESS`, `ON_RETRY_ABANDON`, `ON_RETRY_TIMEOUT`, `ON_RETRY_ABORT`.
+
+### Changed
+
+- **Edge-force is now off by default** (`on_edge_force`, was on in 1.4.0/1.5.0). Prod evidence (2026-06-19) showed it cannot fix the on-failure: during the stall the gateway never consumes the command slot, so writing OFF before the ON is a no-op. Kept as an opt-in kill-switch; the long-window resend above is the durable fix.
+
 ## [1.5.0] — 2026-06-19
 
 ### Fixed

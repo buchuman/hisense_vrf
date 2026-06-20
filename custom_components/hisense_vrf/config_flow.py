@@ -21,6 +21,7 @@ from .const import (
     CONF_CONNECT_TIMEOUT,
     CONF_OFF_PENDING_TTL,
     CONF_ON_EDGE_FORCE,
+    CONF_ON_RETRY,
     CONF_POLL_GATEWAY_EVERY_N,
     CONF_POLL_INTERVAL,
     CONF_POLL_SPACING,
@@ -30,6 +31,7 @@ from .const import (
     DEFAULT_CONNECT_TIMEOUT,
     DEFAULT_OFF_PENDING_TTL,
     DEFAULT_ON_EDGE_FORCE,
+    DEFAULT_ON_RETRY,
     DEFAULT_POLL_GATEWAY_EVERY_N,
     DEFAULT_POLL_INTERVAL,
     DEFAULT_POLL_SPACING,
@@ -104,6 +106,7 @@ class HisenseVRFConfigFlow(ConfigFlow, domain=DOMAIN):
                         ),
                         CONF_CONNECT_TIMEOUT: float(user_input[CONF_CONNECT_TIMEOUT]),
                         CONF_ON_EDGE_FORCE: bool(user_input[CONF_ON_EDGE_FORCE]),
+                        CONF_ON_RETRY: bool(user_input[CONF_ON_RETRY]),
                     },
                 )
 
@@ -151,6 +154,9 @@ class HisenseVRFConfigFlow(ConfigFlow, domain=DOMAIN):
                 ),
                 vol.Required(
                     CONF_ON_EDGE_FORCE, default=DEFAULT_ON_EDGE_FORCE
+                ): bool,
+                vol.Required(
+                    CONF_ON_RETRY, default=DEFAULT_ON_RETRY
                 ): bool,
             }
         )
@@ -229,6 +235,7 @@ class HisenseVRFOptionsFlow(OptionsFlowWithReload):
                     ),
                     CONF_CONNECT_TIMEOUT: float(user_input[CONF_CONNECT_TIMEOUT]),
                     CONF_ON_EDGE_FORCE: bool(user_input[CONF_ON_EDGE_FORCE]),
+                    CONF_ON_RETRY: bool(user_input[CONF_ON_RETRY]),
                 },
             )
 
@@ -284,6 +291,10 @@ class HisenseVRFOptionsFlow(OptionsFlowWithReload):
                 vol.Required(
                     CONF_ON_EDGE_FORCE,
                     default=current.get(CONF_ON_EDGE_FORCE, DEFAULT_ON_EDGE_FORCE),
+                ): bool,
+                vol.Required(
+                    CONF_ON_RETRY,
+                    default=current.get(CONF_ON_RETRY, DEFAULT_ON_RETRY),
                 ): bool,
             }
         )

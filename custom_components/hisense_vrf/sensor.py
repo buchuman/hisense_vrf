@@ -470,7 +470,7 @@ class LastWriteStatusSensor(HisenseVRFIndoorEntity, SensorEntity):
     _attr_translation_key = "last_write_status"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_device_class = SensorDeviceClass.ENUM
-    _attr_options = ["idle", "pending", "off_pending", "confirmed", "failed"]
+    _attr_options = ["idle", "pending", "off_pending", "retrying", "confirmed", "failed"]
 
     def __init__(self, controller: HisenseVRFController, unit_index: int) -> None:
         super().__init__(controller, unit_index)

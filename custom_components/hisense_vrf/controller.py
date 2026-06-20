@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from datetime import datetime
@@ -39,6 +40,10 @@ from .const import (
     ON_EDGE_DRAIN_TIMEOUT_S,
     ON_EDGE_POLL_INTERVAL_S,
     ON_EDGE_SETTLE_S,
+    ON_RETRY_INTERVAL_S,
+    ON_RETRY_JITTER_S,
+    ON_RETRY_TIMEOUT_S,
+    ON_RETRY_WATCH_INTERVAL_S,
     UNAVAILABLE_THRESHOLD,
     WRITE_FAILED_ISSUE_THRESHOLD,
     WRITE_STATUS_CONFIRMED,
@@ -46,6 +51,7 @@ from .const import (
     WRITE_STATUS_IDLE,
     WRITE_STATUS_OFF_PENDING,
     WRITE_STATUS_PENDING,
+    WRITE_STATUS_RETRYING,
     signal_new_indoor,
     signal_new_outdoor,
 )
@@ -91,7 +97,8 @@ class HisenseVRFController:
         poll_interval_s: float,
         poll_spacing_s: float,
         poll_gateway_every_n: int,
-        on_edge_force: bool = True,
+        on_edge_force: bool = False,
+        on_retry: bool = True,
     ) -> None:
         self.hass = hass
         self.entry_id = entry_id
@@ -109,7 +116,16 @@ class HisenseVRFController:
         # IR-driven OFF desyncs the gateway's run baseline. Kill-switch only;
         # has no effect on units that power on cleanly on the first round.
         self.on_edge_force = on_edge_force
+        # When True, a failed synchronous power-on starts a per-unit background
+        # task that keeps resending the ON bundle (long-window resend) until the
+        # unit reports running, an external change is seen, a new command
+        # supersedes it, or ON_RETRY_TIMEOUT_S elapses. Scoped to the ON path.
+        self.on_retry = on_retry
         self._polling_task: asyncio.Task | None = None
+        # Per-unit background power-on retry tasks + a monotonically increasing
+        # epoch used to detect when a retry has been superseded.
+        self._on_retry_tasks: dict[int, asyncio.Task] = {}
+        self._on_retry_epoch: dict[int, int] = {}
 
         self.unit_indices: list[int] = []
         self.unit_identifiers: dict[int, tuple[int, int]] = {}
@@ -259,6 +275,8 @@ class HisenseVRFController:
 
     async def async_shutdown(self) -> None:
         await self.async_stop_polling()
+        for unit_index in list(self._on_retry_tasks):
+            self._cancel_on_retry(unit_index, reason="shutdown")
         for timer in self._off_timers.values():
             timer.cancel()
         self._off_timers.clear()
@@ -473,6 +491,9 @@ class HisenseVRFController:
         user = await self._resolve_user(context)
         name = self.unit_name(unit_index)
 
+        # A fresh ON supersedes any in-flight long-window retry for this unit.
+        self._cancel_on_retry(unit_index, reason="new ON command")
+
         if not self.gateway_controllable:
             _LOGGER.warning(
                 "ON_BLOCKED unit=%s user=%s — gateway not controllable (ctrl_mode!=1)",
@@ -601,7 +622,7 @@ class HisenseVRFController:
 
             pre_retry_fn = _edge_force
 
-        return await self.async_write_and_verify(
+        ok = await self.async_write_and_verify(
             unit_index,
             pending_attrs=pending_attrs,
             verify_fn=lambda s: (
@@ -617,6 +638,282 @@ class HisenseVRFController:
             retry_on_no_response=True,
             pre_retry_fn=pre_retry_fn,
         )
+
+        # The synchronous attempt failed to confirm. Only the ON command suffers
+        # the intermittent on-failure, so hand off to the long-window background
+        # resend (if enabled and the gateway is still controllable) rather than
+        # leaving the unit off. The retry recomposes the bundle each round, so it
+        # picks up any setpoint/mode/fan the user changes while it runs.
+        if not ok and self.on_retry and self.gateway_controllable:
+            self._start_on_retry(unit_index, user=user)
+
+        return ok
+
+    # ── Long-window power-on resend (only the ON command fails) ──────────────
+
+    _ON_SNAPSHOT_FIELDS = (
+        "current_mode",
+        "fan_speed",
+        "setpoint",
+        "auto_swing",
+        "louver_position",
+    )
+
+    def _compose_on_payload(
+        self, unit_index: int
+    ) -> tuple[dict[str, Any], int, int, int, int] | None:
+        """Recompose the ON bundle from current state + accumulated off_pending.
+
+        Returns ``(pending_attrs, mode, fan, swing_reg, temp)`` or ``None`` if a
+        required field is unknown. Unlike ``async_send_on_with_pending`` this does
+        NOT pop off_pending, so the background retry can call it every round and
+        pick up any setpoint/mode/fan the user changes mid-retry.
+        """
+        state = self.indoor_states.get(unit_index)
+        off_p = self._off_pending.get(unit_index, {})
+
+        def pick(field: str) -> Any:
+            if field in off_p:
+                return off_p[field]
+            if state is not None:
+                return getattr(state, field, None)
+            return None
+
+        mode = pick("current_mode")
+        fan = pick("fan_speed")
+        setpoint = pick("setpoint")
+        auto_swing = pick("auto_swing")
+        louver_position = pick("louver_position")
+        if None in (mode, fan, setpoint, auto_swing, louver_position):
+            return None
+
+        swing_reg = _swing_to_register(bool(auto_swing), int(louver_position))
+        temp_int = int(setpoint)
+        pending_attrs = {
+            "is_running": True,
+            "current_mode": mode,
+            "fan_speed": fan,
+            "auto_swing": bool(auto_swing),
+            "louver_position": int(louver_position),
+            "setpoint": float(temp_int),
+        }
+        return pending_attrs, mode, fan, swing_reg, temp_int
+
+    def _on_state_snapshot(self, unit_index: int) -> dict[str, Any]:
+        state = self.indoor_states.get(unit_index)
+        if state is None:
+            return {}
+        return {f: getattr(state, f, None) for f in self._ON_SNAPSHOT_FIELDS}
+
+    def _external_change(
+        self, snapshot: dict[str, Any], state: ACDeviceState
+    ) -> str | None:
+        """Detect a state change we did not cause (IR remote, another actor).
+
+        During the stall the unit does not consume our writes, so its reported
+        settings stay frozen; any change to mode/fan/setpoint/swing means someone
+        else is now driving the unit and we must yield control.
+        """
+        for field in self._ON_SNAPSHOT_FIELDS:
+            old = snapshot.get(field)
+            new = getattr(state, field, None)
+            if old is not None and new is not None and old != new:
+                return f"{field}:{old}->{new}"
+        return None
+
+    def _cancel_on_retry(self, unit_index: int, *, reason: str) -> None:
+        """Stop an in-flight power-on retry (new command / OFF / shutdown)."""
+        # Bump the epoch so any iteration already past its cancel checkpoint bails.
+        if unit_index in self._on_retry_epoch:
+            self._on_retry_epoch[unit_index] += 1
+        task = self._on_retry_tasks.pop(unit_index, None)
+        if task is not None and not task.done():
+            task.cancel()
+            _LOGGER.info(
+                "ON_RETRY_CANCELLED unit=%s — %s",
+                self.unit_name(unit_index), reason,
+            )
+
+    def _start_on_retry(self, unit_index: int, *, user: str) -> None:
+        name = self.unit_name(unit_index)
+        epoch = self._on_retry_epoch.get(unit_index, 0) + 1
+        self._on_retry_epoch[unit_index] = epoch
+        snapshot = self._on_state_snapshot(unit_index)
+
+        # Keep the optimistic overlay alive so the card stays ON while we retry.
+        payload = self._compose_on_payload(unit_index)
+        overlay = payload[0] if payload is not None else {"is_running": True}
+        self.pending.setdefault(unit_index, {}).update(overlay)
+
+        self.last_write_status[unit_index] = {
+            "status": WRITE_STATUS_RETRYING,
+            "fields": ["is_running"],
+            "attempt": 0,
+            "remaining_s": ON_RETRY_TIMEOUT_S,
+            "user": user,
+            "timestamp": _now_iso(),
+        }
+        self._notify()
+        _LOGGER.warning(
+            "ON_RETRY_START unit=%s user=%s — long-window resend every ~%.0fs up to %.0fs",
+            name, user, ON_RETRY_INTERVAL_S, ON_RETRY_TIMEOUT_S,
+        )
+        self._on_retry_tasks[unit_index] = self.hass.async_create_background_task(
+            self._on_retry_loop(unit_index, epoch, user, snapshot),
+            name=f"{DOMAIN}_on_retry_{self.entry_id}_{unit_index}",
+        )
+
+    def _touch_on_retry_status(
+        self, unit_index: int, user: str, attempt: int, remaining_s: float
+    ) -> None:
+        self.last_write_status[unit_index] = {
+            "status": WRITE_STATUS_RETRYING,
+            "fields": ["is_running"],
+            "attempt": attempt,
+            "remaining_s": round(max(0.0, remaining_s), 1),
+            "user": user,
+            "timestamp": _now_iso(),
+        }
+        self._notify()
+
+    def _finish_on_retry(
+        self, unit_index: int, *, status: str, user: str, reason: str, attempt: int
+    ) -> None:
+        self._on_retry_tasks.pop(unit_index, None)
+        bucket = self.pending.get(unit_index)
+        if bucket:
+            bucket.clear()
+        self.last_write_status[unit_index] = {
+            "status": status,
+            "reason": reason,
+            "attempts": attempt,
+            "user": user,
+            "timestamp": _now_iso(),
+        }
+        if status == WRITE_STATUS_CONFIRMED:
+            self._on_write_confirmed(unit_index)
+        elif status == WRITE_STATUS_FAILED:
+            self._on_write_failed(unit_index)
+        self._notify()
+
+    async def _on_retry_resend(self, unit_index: int, attempt: int, user: str) -> None:
+        name = self.unit_name(unit_index)
+        payload = self._compose_on_payload(unit_index)
+        if payload is None:
+            _LOGGER.warning(
+                "ON_RETRY_RESEND_SKIP unit=%s attempt=%d — missing control fields",
+                name, attempt,
+            )
+            return
+        pending_attrs, mode, fan, swing_reg, temp_int = payload
+        # Refresh the overlay with the (possibly updated) bundle.
+        self.pending.setdefault(unit_index, {}).update(pending_attrs)
+        _LOGGER.warning(
+            "ON_RETRY_RESEND unit=%s user=%s attempt=%d run=1 mode=0x%02x fan=0x%02x temp=%d",
+            name, user, attempt, mode, fan, temp_int,
+        )
+        try:
+            async with self._lock_for(unit_index):
+                await self.client.write_control_block(
+                    unit_index, 1, mode, fan, swing_reg, temp_int
+                )
+        except ModbusReadError as err:
+            _LOGGER.warning(
+                "ON_RETRY_RESEND_FAILED unit=%s attempt=%d — %s", name, attempt, err,
+            )
+
+    async def _on_retry_loop(
+        self, unit_index: int, epoch: int, user: str, snapshot: dict[str, Any]
+    ) -> None:
+        name = self.unit_name(unit_index)
+        loop = self.hass.loop
+        deadline = loop.time() + ON_RETRY_TIMEOUT_S
+        attempt = 0
+        try:
+            while loop.time() < deadline:
+                if self._on_retry_epoch.get(unit_index) != epoch:
+                    return
+                if not self.gateway_controllable:
+                    _LOGGER.warning(
+                        "ON_RETRY_ABORT unit=%s user=%s — gateway not controllable",
+                        name, user,
+                    )
+                    self._finish_on_retry(
+                        unit_index, status=WRITE_STATUS_FAILED, user=user,
+                        reason="gateway not controllable", attempt=attempt,
+                    )
+                    return
+
+                # Watch window: re-read actual state often so we react to an
+                # external power-on / change within ON_RETRY_WATCH_INTERVAL_S.
+                interval = max(
+                    ON_RETRY_WATCH_INTERVAL_S,
+                    ON_RETRY_INTERVAL_S
+                    + random.uniform(-ON_RETRY_JITTER_S, ON_RETRY_JITTER_S),
+                )
+                waited = 0.0
+                while waited < interval and loop.time() < deadline:
+                    await asyncio.sleep(
+                        min(ON_RETRY_WATCH_INTERVAL_S, interval - waited)
+                    )
+                    waited += ON_RETRY_WATCH_INTERVAL_S
+                    if self._on_retry_epoch.get(unit_index) != epoch:
+                        return
+                    try:
+                        state = await self.client.read_device(unit_index)
+                    except ModbusReadError:
+                        continue
+                    self.indoor_states[unit_index] = state
+
+                    if state.is_running:
+                        _LOGGER.warning(
+                            "ON_RETRY_SUCCESS unit=%s user=%s attempt=%d — unit reports running",
+                            name, user, attempt,
+                        )
+                        self._finish_on_retry(
+                            unit_index, status=WRITE_STATUS_CONFIRMED, user=user,
+                            reason="unit running", attempt=attempt,
+                        )
+                        return
+
+                    changed = self._external_change(snapshot, state)
+                    if changed:
+                        _LOGGER.warning(
+                            "ON_RETRY_ABANDON unit=%s user=%s — external change (%s); yielding control",
+                            name, user, changed,
+                        )
+                        self._finish_on_retry(
+                            unit_index, status=WRITE_STATUS_IDLE, user=user,
+                            reason=f"external change: {changed}", attempt=attempt,
+                        )
+                        return
+
+                    self._touch_on_retry_status(
+                        unit_index, user, attempt, deadline - loop.time()
+                    )
+
+                if loop.time() >= deadline:
+                    break
+                attempt += 1
+                await self._on_retry_resend(unit_index, attempt, user)
+
+            _LOGGER.warning(
+                "ON_RETRY_TIMEOUT unit=%s user=%s attempts=%d — giving up after %.0fs",
+                name, user, attempt, ON_RETRY_TIMEOUT_S,
+            )
+            self._finish_on_retry(
+                unit_index, status=WRITE_STATUS_FAILED, user=user,
+                reason="timeout", attempt=attempt,
+            )
+        except asyncio.CancelledError:
+            _LOGGER.info("ON_RETRY_STOP unit=%s — cancelled", name)
+            raise
+        except Exception:  # noqa: BLE001
+            _LOGGER.exception("ON_RETRY_ERROR unit=%s — unexpected error", name)
+            self._finish_on_retry(
+                unit_index, status=WRITE_STATUS_FAILED, user=user,
+                reason="error", attempt=attempt,
+            )
 
     async def _on_edge_force_prewrite(
         self, unit_index: int, name: str, user: str
@@ -1083,6 +1380,11 @@ class HisenseVRFController:
         verbose = verbose_on_debug and _LOGGER.isEnabledFor(logging.DEBUG)
         total_rounds = 2 if retry_on_no_response else 1
         total_reads = self.verify_retries + 1
+
+        # An explicit OFF supersedes any in-flight power-on retry: the user no
+        # longer wants the unit on, so stop resending immediately.
+        if pending_attrs.get("is_running") is False:
+            self._cancel_on_retry(unit_index, reason="OFF command")
 
         if not self.gateway_controllable:
             _LOGGER.warning(

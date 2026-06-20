@@ -1,6 +1,7 @@
 """Tests for the climate platform: dynamic capabilities and on/off routing."""
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import AsyncMock
 
 import pytest
@@ -60,6 +61,10 @@ def scanned_climate(hass, mock_client):
         poll_spacing_s=0.0,
         poll_gateway_every_n=10,
     )
+    # Default both on-failure workarounds off; tests opt in explicitly so the
+    # background retry doesn't add writes behind assertions.
+    c.on_edge_force = False
+    c.on_retry = False
     c.unit_indices = [0]
     c.unit_identifiers = {0: (0, 0)}
     c.unit_capacities = {0: 22}
@@ -430,6 +435,7 @@ async def test_power_on_retry_forces_edge_when_enabled(
     monkeypatch.setattr(
         "custom_components.hisense_vrf.controller.ON_EDGE_DRAIN_TIMEOUT_S", 0.0
     )
+    scanned_climate.controller.on_edge_force = True
     scanned_climate.controller.indoor_states[0] = make_indoor_state(
         is_running=False, current_mode=MODE_HEAT, fan_speed=FAN_HIGH,
         setpoint=24.0, auto_swing=False, louver_position=0,
@@ -503,3 +509,131 @@ async def test_edge_force_waits_for_off_to_drain(
     # (slot_before + at least two drain polls = 3+ reads).
     mock_client.turn_off.assert_awaited_once()
     assert len(calls) >= 3
+
+
+# ── Long-window power-on resend (v1.6.0) ─────────────────────────────────────
+
+
+def _on_state(idx=0, *, running, mode=MODE_HEAT, fan=FAN_HIGH, setpoint=24.0):
+    return make_indoor_state(
+        unit_index=idx, is_running=running, current_mode=mode, fan_speed=fan,
+        setpoint=setpoint, auto_swing=False, louver_position=0,
+    )
+
+
+def _fast_retry(monkeypatch, *, interval=0.02, watch=0.01, timeout=5.0, jitter=0.0):
+    for name, val in (
+        ("ON_RETRY_INTERVAL_S", interval),
+        ("ON_RETRY_WATCH_INTERVAL_S", watch),
+        ("ON_RETRY_TIMEOUT_S", timeout),
+        ("ON_RETRY_JITTER_S", jitter),
+    ):
+        monkeypatch.setattr(f"custom_components.hisense_vrf.controller.{name}", val)
+
+
+async def _prime_on_failure(c, mock_client, read_side_effect):
+    """Unit off + read_device follows the side effect; fire ON; return retry task."""
+    c.on_retry = True
+    c.indoor_states[0] = _on_state(running=False)
+    mock_client.read_device.side_effect = read_side_effect
+    ok = await c.async_send_on_with_pending(0)
+    assert ok is False  # the synchronous attempt fails → background retry starts
+    return c._on_retry_tasks.get(0)
+
+
+async def test_on_retry_stops_when_unit_reports_running(
+    scanned_climate, mock_client, monkeypatch
+):
+    """The retry stops and confirms as soon as the unit reports running — by any
+    path (our resend, the IR remote, another user)."""
+    _fast_retry(monkeypatch)
+    c = scanned_climate.controller
+    reads = {"n": 0}
+
+    def read(idx):
+        reads["n"] += 1
+        # off during the synchronous rounds, then running
+        return _on_state(idx, running=reads["n"] >= 3)
+
+    task = await _prime_on_failure(c, mock_client, read)
+    assert task is not None
+    await task
+
+    assert c.last_write_status[0]["status"] == "confirmed"
+    assert not c.pending.get(0)  # optimistic overlay cleared
+
+
+async def test_on_retry_resends_then_times_out(
+    scanned_climate, mock_client, monkeypatch
+):
+    """If the unit never comes on, the retry keeps resending then gives up."""
+    _fast_retry(monkeypatch, interval=0.02, watch=0.01, timeout=0.08)
+    c = scanned_climate.controller
+
+    task = await _prime_on_failure(c, mock_client, lambda idx: _on_state(idx, running=False))
+    assert task is not None
+    await task
+
+    assert c.last_write_status[0]["status"] == "failed"
+    assert c.last_write_status[0]["reason"] == "timeout"
+    # 2 synchronous rounds + at least one background resend.
+    assert mock_client.write_control_block.await_count >= 3
+
+
+async def test_on_retry_abandons_on_external_change(
+    scanned_climate, mock_client, monkeypatch
+):
+    """An externally-originated state change (still off) makes the retry yield."""
+    _fast_retry(monkeypatch)
+    c = scanned_climate.controller
+    reads = {"n": 0}
+
+    def read(idx):
+        reads["n"] += 1
+        # snapshot settles at setpoint 24; then someone changes it to 25 off-bus
+        return _on_state(idx, running=False, setpoint=24.0 if reads["n"] < 3 else 25.0)
+
+    task = await _prime_on_failure(c, mock_client, read)
+    assert task is not None
+    await task
+
+    assert c.last_write_status[0]["status"] == "idle"
+    assert "external change" in c.last_write_status[0]["reason"]
+
+
+async def test_on_retry_cancelled_by_off(scanned_climate, mock_client, monkeypatch):
+    """An explicit OFF supersedes and stops the in-flight retry."""
+    _fast_retry(monkeypatch)
+    c = scanned_climate.controller
+
+    task = await _prime_on_failure(c, mock_client, lambda idx: _on_state(idx, running=False))
+    assert task is not None and not task.done()
+
+    await c.async_write_and_verify(
+        0,
+        pending_attrs={"is_running": False},
+        verify_fn=lambda s: not s.is_running,
+        write_fn=AsyncMock(),
+    )
+
+    assert 0 not in c._on_retry_tasks
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+
+async def test_on_retry_restarted_by_new_on(
+    scanned_climate, mock_client, monkeypatch
+):
+    """A fresh ON supersedes the running retry with a new one."""
+    _fast_retry(monkeypatch)
+    c = scanned_climate.controller
+
+    task1 = await _prime_on_failure(c, mock_client, lambda idx: _on_state(idx, running=False))
+    assert task1 is not None
+
+    ok = await c.async_send_on_with_pending(0)
+    assert ok is False
+    task2 = c._on_retry_tasks.get(0)
+    assert task2 is not None and task2 is not task1
+    with pytest.raises(asyncio.CancelledError):
+        await task1
