@@ -328,6 +328,7 @@ def _build_indoor_sensors(
         IndoorSensor(controller, idx, desc) for desc in INDOOR_SENSORS
     ]
     entities.append(LastWriteStatusSensor(controller, idx))
+    entities.append(PowerOnRetryProgressSensor(controller, idx))
     entities.append(RegisterBaseAddressSensor(controller, idx))
     entities.append(CommandSlotSensor(controller, idx))
     for exp in ENUM_DESCRIPTORS:
@@ -491,6 +492,59 @@ class LastWriteStatusSensor(HisenseVRFIndoorEntity, SensorEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         info = self.controller.last_write_status.get(self.unit_index, {})
         return {k: v for k, v in info.items() if k != "status"}
+
+
+class PowerOnRetryProgressSensor(HisenseVRFIndoorEntity, SensorEntity):
+    """Progress (0-100%) of an in-flight long-window power-on retry.
+
+    Reads ``unknown`` when no retry is running; while retrying it reports the
+    fraction of the retry window elapsed, so it can be shown as a gauge/bar.
+    ``attempt`` and ``remaining_s`` are exposed as attributes.
+    """
+
+    _attr_translation_key = "power_on_retry"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:progress-clock"
+
+    def __init__(self, controller: HisenseVRFController, unit_index: int) -> None:
+        super().__init__(controller, unit_index)
+        self._attr_unique_id = f"{controller.entry_id}_indoor_{unit_index}_power_on_retry"
+
+    @property
+    def available(self) -> bool:
+        return True
+
+    def _info(self) -> dict[str, Any]:
+        # Tie to the live retry task, not the status string: a cancelled retry
+        # drops the task immediately (the superseding command sets the status).
+        if not self.controller.on_retry_active(self.unit_index):
+            return {}
+        return self.controller.last_write_status.get(self.unit_index, {})
+
+    @property
+    def native_value(self) -> StateType:
+        info = self._info()
+        if not info:
+            return None
+        total = info.get("total_s") or 0
+        remaining = info.get("remaining_s")
+        if not total or remaining is None:
+            return 0
+        pct = 100.0 * (total - remaining) / total
+        return round(max(0.0, min(100.0, pct)), 1)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        info = self._info()
+        if not info:
+            return {}
+        return {
+            "attempt": info.get("attempt"),
+            "remaining_s": info.get("remaining_s"),
+            "total_s": info.get("total_s"),
+        }
 
 
 class GatewayUnitCountSensor(HisenseVRFGatewayEntity, SensorEntity):

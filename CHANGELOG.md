@@ -4,6 +4,12 @@ All notable changes to the Hisense VRF integration are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.3] — 2026-06-21
+
+### Added
+
+- **`Power-on retry` progress sensor (per indoor unit, diagnostic).** Reports the percentage of the retry window elapsed (0→100%) while a long-window power-on retry is in flight, with `attempt`, `remaining_s` and `total_s` as attributes; reads `unknown` when no retry is running. Put it on a gauge/bar card to watch a retry progress (and how long until it gives up). Tied to the live retry task, so it clears the moment the retry ends.
+
 ## [1.6.2] — 2026-06-21
 
 ### Changed

@@ -245,6 +245,9 @@
           "failed": "Failed"
         }
       },
+      "power_on_retry": {
+        "name": "Power-on retry"
+      },
       "ou_model_name": {
         "name": "Model name"
       },

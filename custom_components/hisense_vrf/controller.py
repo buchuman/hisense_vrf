@@ -769,6 +769,7 @@ class HisenseVRFController:
             "fields": ["is_running"],
             "attempt": 0,
             "remaining_s": ON_RETRY_TIMEOUT_S,
+            "total_s": ON_RETRY_TIMEOUT_S,
             "user": user,
             "timestamp": _now_iso(),
         }
@@ -790,6 +791,7 @@ class HisenseVRFController:
             "fields": ["is_running"],
             "attempt": attempt,
             "remaining_s": round(max(0.0, remaining_s), 1),
+            "total_s": ON_RETRY_TIMEOUT_S,
             "user": user,
             "timestamp": _now_iso(),
         }

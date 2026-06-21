@@ -651,6 +651,29 @@ async def test_climate_shows_preheating_during_retry(
     assert scanned_climate.hvac_action is None
 
 
+async def test_power_on_retry_progress_sensor(
+    scanned_climate, mock_client, monkeypatch
+):
+    """The progress sensor is unknown when idle and a 0-100% value while retrying."""
+    from custom_components.hisense_vrf.sensor import PowerOnRetryProgressSensor
+
+    _fast_retry(monkeypatch, timeout=100.0)
+    c = scanned_climate.controller
+    sensor = PowerOnRetryProgressSensor(c, 0)
+    assert sensor.native_value is None  # no retry → unknown
+
+    task = await _prime_on_failure(c, mock_client, lambda idx: _on_state(idx, running=False))
+    val = sensor.native_value
+    assert isinstance(val, float) and 0.0 <= val <= 100.0
+    assert "attempt" in sensor.extra_state_attributes
+    assert "remaining_s" in sensor.extra_state_attributes
+
+    c._cancel_on_retry(0, reason="test cleanup")
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert sensor.native_value is None  # back to unknown once it ends
+
+
 async def test_on_retry_restarted_by_new_on(
     scanned_climate, mock_client, monkeypatch
 ):
