@@ -572,6 +572,10 @@ async def test_on_retry_resends_then_times_out(
 
     task = await _prime_on_failure(c, mock_client, lambda idx: _on_state(idx, running=False))
     assert task is not None
+    # While retrying, the unit must NOT be shown optimistically ON — it is
+    # physically off, so no is_running overlay (truthful off until confirmed).
+    assert "is_running" not in c.pending.get(0, {})
+
     await task
 
     assert c.last_write_status[0]["status"] == "failed"

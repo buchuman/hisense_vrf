@@ -4,6 +4,12 @@ All notable changes to the Hisense VRF integration are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] — 2026-06-21
+
+### Fixed
+
+- **Power-on retry no longer shows a unit as ON while it is physically OFF.** v1.6.0 kept an optimistic `is_running=True` overlay for the whole retry window, so a unit could be marked ON in HA for up to 6 minutes while actually off — misleading, and it invited conflicting commands (observed in prod 2026-06-21: a unit shown ON was off; a user then issued an OFF that "failed"). The background retry now keeps **no** optimistic overlay: the card reflects the real (off) state for the whole window and only flips ON once the unit actually confirms running. The `retrying` write-status remains the in-progress signal.
+
 ## [1.6.0] — 2026-06-20
 
 ### Added

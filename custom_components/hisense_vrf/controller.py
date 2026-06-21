@@ -740,10 +740,12 @@ class HisenseVRFController:
         self._on_retry_epoch[unit_index] = epoch
         snapshot = self._on_state_snapshot(unit_index)
 
-        # Keep the optimistic overlay alive so the card stays ON while we retry.
-        payload = self._compose_on_payload(unit_index)
-        overlay = payload[0] if payload is not None else {"is_running": True}
-        self.pending.setdefault(unit_index, {}).update(overlay)
+        # Do NOT assert an optimistic is_running overlay while retrying: the unit
+        # is physically OFF for the whole window and showing it ON for up to
+        # ON_RETRY_TIMEOUT_S misleads the user (and invites conflicting commands).
+        # The card reflects the real (off) state; the `retrying` write-status is
+        # the only signal that a resend is in progress. It flips ON only once the
+        # unit actually confirms running.
 
         self.last_write_status[unit_index] = {
             "status": WRITE_STATUS_RETRYING,
@@ -805,9 +807,9 @@ class HisenseVRFController:
                 name, attempt,
             )
             return
-        pending_attrs, mode, fan, swing_reg, temp_int = payload
-        # Refresh the overlay with the (possibly updated) bundle.
-        self.pending.setdefault(unit_index, {}).update(pending_attrs)
+        _pending_attrs, mode, fan, swing_reg, temp_int = payload
+        # No optimistic overlay: the card keeps showing the real (off) state
+        # until the unit actually confirms running (see _start_on_retry).
         _LOGGER.warning(
             "ON_RETRY_RESEND unit=%s user=%s attempt=%d run=1 mode=0x%02x fan=0x%02x temp=%d",
             name, user, attempt, mode, fan, temp_int,
