@@ -7,6 +7,7 @@ from typing import Any
 from homeassistant.components.climate import (
     ClimateEntity,
     ClimateEntityFeature,
+    HVACAction,
     HVACMode,
 )
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
@@ -214,12 +215,27 @@ class HisenseVRFClimate(HisenseVRFIndoorEntity, ClimateEntity):
 
     @property
     def hvac_mode(self) -> HVACMode | None:
+        # While a power-on retry is in flight the unit is physically off, but we
+        # surface the chosen mode (paired with hvac_action=preheating below) so
+        # the card shows "turning on", neither a plain OFF nor a false ON.
+        retry_mode = self.controller.on_retry_target_mode(self.unit_index)
+        if retry_mode is not None:
+            return BITS_TO_HVAC.get(retry_mode)
         state = self.display_state
         if state is None:
             return None
         if not state.is_running:
             return HVACMode.OFF
         return BITS_TO_HVAC.get(state.current_mode)
+
+    @property
+    def hvac_action(self) -> HVACAction | None:
+        # PREHEATING marks the long-window power-on retry (chosen mode shown, but
+        # not yet running). Outside a retry we return None so the card keeps its
+        # existing behaviour (it infers the action from hvac_mode).
+        if self.controller.on_retry_active(self.unit_index):
+            return HVACAction.PREHEATING
+        return None
 
     @property
     def fan_mode(self) -> str | None:

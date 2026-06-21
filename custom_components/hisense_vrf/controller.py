@@ -126,6 +126,9 @@ class HisenseVRFController:
         # epoch used to detect when a retry has been superseded.
         self._on_retry_tasks: dict[int, asyncio.Task] = {}
         self._on_retry_epoch: dict[int, int] = {}
+        # Target mode bits of an in-flight power-on retry, so the climate can show
+        # the chosen mode with hvac_action=preheating (not ON, not plain OFF).
+        self._on_retry_target_mode: dict[int, int] = {}
 
         self.unit_indices: list[int] = []
         self.unit_identifiers: dict[int, tuple[int, int]] = {}
@@ -721,11 +724,22 @@ class HisenseVRFController:
                 return f"{field}:{old}->{new}"
         return None
 
+    def on_retry_active(self, unit_index: int) -> bool:
+        """True while a long-window power-on retry is in flight for this unit."""
+        return unit_index in self._on_retry_tasks
+
+    def on_retry_target_mode(self, unit_index: int) -> int | None:
+        """Mode bits the in-flight retry is trying to power on to (else None)."""
+        if unit_index not in self._on_retry_tasks:
+            return None
+        return self._on_retry_target_mode.get(unit_index)
+
     def _cancel_on_retry(self, unit_index: int, *, reason: str) -> None:
         """Stop an in-flight power-on retry (new command / OFF / shutdown)."""
         # Bump the epoch so any iteration already past its cancel checkpoint bails.
         if unit_index in self._on_retry_epoch:
             self._on_retry_epoch[unit_index] += 1
+        self._on_retry_target_mode.pop(unit_index, None)
         task = self._on_retry_tasks.pop(unit_index, None)
         if task is not None and not task.done():
             task.cancel()
@@ -743,9 +757,12 @@ class HisenseVRFController:
         # Do NOT assert an optimistic is_running overlay while retrying: the unit
         # is physically OFF for the whole window and showing it ON for up to
         # ON_RETRY_TIMEOUT_S misleads the user (and invites conflicting commands).
-        # The card reflects the real (off) state; the `retrying` write-status is
-        # the only signal that a resend is in progress. It flips ON only once the
-        # unit actually confirms running.
+        # Instead the climate shows the chosen mode with hvac_action=preheating
+        # (neither ON nor a plain OFF) via _on_retry_target_mode; the switch stays
+        # truthfully off. It flips to a real ON only once the unit confirms.
+        payload = self._compose_on_payload(unit_index)
+        if payload is not None:
+            self._on_retry_target_mode[unit_index] = payload[1]
 
         self.last_write_status[unit_index] = {
             "status": WRITE_STATUS_RETRYING,
@@ -782,6 +799,7 @@ class HisenseVRFController:
         self, unit_index: int, *, status: str, user: str, reason: str, attempt: int
     ) -> None:
         self._on_retry_tasks.pop(unit_index, None)
+        self._on_retry_target_mode.pop(unit_index, None)
         bucket = self.pending.get(unit_index)
         if bucket:
             bucket.clear()

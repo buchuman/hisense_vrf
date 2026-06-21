@@ -10,6 +10,7 @@ from custom_components.hisense_vrf.climate import HisenseVRFClimate
 from custom_components.hisense_vrf.const import DOMAIN
 from homeassistant.components.climate import (
     ClimateEntityFeature,
+    HVACAction,
     HVACMode,
 )
 from pyacmodbus import (
@@ -623,6 +624,31 @@ async def test_on_retry_cancelled_by_off(scanned_climate, mock_client, monkeypat
     assert 0 not in c._on_retry_tasks
     with pytest.raises(asyncio.CancelledError):
         await task
+
+
+async def test_climate_shows_preheating_during_retry(
+    scanned_climate, mock_client, monkeypatch
+):
+    """While retrying, the card shows the chosen mode + hvac_action=preheating —
+    neither a false ON nor a plain OFF — and the raw power stays off."""
+    _fast_retry(monkeypatch, timeout=5.0)
+    c = scanned_climate.controller
+
+    task = await _prime_on_failure(
+        c, mock_client, lambda idx: _on_state(idx, running=False, mode=MODE_HEAT)
+    )
+    assert task is not None
+
+    assert scanned_climate.hvac_mode == HVACMode.HEAT
+    assert scanned_climate.hvac_action == HVACAction.PREHEATING
+    assert c.is_powered_on(0) is False  # switch/raw state stays truthfully off
+
+    c._cancel_on_retry(0, reason="test cleanup")
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    # Once the retry is gone, the card falls back to the real (off) state.
+    assert scanned_climate.hvac_mode == HVACMode.OFF
+    assert scanned_climate.hvac_action is None
 
 
 async def test_on_retry_restarted_by_new_on(

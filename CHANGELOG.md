@@ -4,6 +4,12 @@ All notable changes to the Hisense VRF integration are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.2] — 2026-06-21
+
+### Changed
+
+- **The climate card now shows a distinct "powering on" state during a retry** — neither a false ON nor a misleading plain OFF. While a long-window power-on retry is in flight, the climate entity reports the chosen mode (e.g. Heat) with `hvac_action = preheating`, so the thermostat card reads "Heat / Preheating…". On confirmation it becomes the real running state (`Heat / Heating`); on failure/timeout it returns to `Off`. The raw power switch and `is_running` stay truthfully off until the unit actually confirms. (Resolves the 1.6.0/1.6.1 back-and-forth on how the retry should surface in the UI.)
+
 ## [1.6.1] — 2026-06-21
 
 ### Fixed
