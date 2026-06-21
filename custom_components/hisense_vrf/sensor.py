@@ -495,10 +495,11 @@ class LastWriteStatusSensor(HisenseVRFIndoorEntity, SensorEntity):
 
 
 class PowerOnRetryProgressSensor(HisenseVRFIndoorEntity, SensorEntity):
-    """Progress (0-100%) of an in-flight long-window power-on retry.
+    """Time remaining (0-100%) of an in-flight long-window power-on retry.
 
     Reads ``unknown`` when no retry is running; while retrying it reports the
-    fraction of the retry window elapsed, so it can be shown as a gauge/bar.
+    fraction of the retry window *left* (100% at the start, draining toward 0%
+    as it approaches giving up), so a gauge/bar reads as a countdown.
     ``attempt`` and ``remaining_s`` are exposed as attributes.
     """
 
@@ -531,8 +532,8 @@ class PowerOnRetryProgressSensor(HisenseVRFIndoorEntity, SensorEntity):
         total = info.get("total_s") or 0
         remaining = info.get("remaining_s")
         if not total or remaining is None:
-            return 0
-        pct = 100.0 * (total - remaining) / total
+            return 100
+        pct = 100.0 * remaining / total
         return round(max(0.0, min(100.0, pct)), 1)
 
     @property
